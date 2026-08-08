@@ -789,7 +789,26 @@ export interface Form2441Data {
 }
 
 // --- Form 8863 (Education Credits) ---
+export const USTAXES_HTTP_CONTRACT_VERSION =
+  'ustaxes-http-education-election-v2' as const
+
+export const FORM_8863_CONTRACT_VERSION =
+  'form8863-explicit-election-v1' as const
+
+export type EducationCreditElection8863 = 'aotc' | 'llc'
+
+export interface EducationCreditEligibility8863 {
+  policyVersion: string
+  aotc: 'eligible' | 'ineligible' | 'unknown'
+  llc: 'eligible' | 'ineligible' | 'unknown'
+}
+
 export interface Student8863 {
+  /** Opaque TaxScout identities; never a name, TIN, or other PII. */
+  studentPersonId: string
+  educationExpenseSetId: string
+  creditElection: EducationCreditElection8863
+  eligibility: EducationCreditEligibility8863
   name: string
   ssn: string
   institutionName: string
@@ -806,6 +825,7 @@ export interface Student8863 {
 }
 
 export interface Form8863Data {
+  contractVersion: typeof FORM_8863_CONTRACT_VERSION
   students: Student8863[]
 }
 
