@@ -58,7 +58,11 @@ export default class F8863 extends F1040Attachment {
 
   // Part III line 27: Adjusted qualified expenses per student (max $4,000 for AOTC)
   studentAOTCExpenses = (student: Student8863): number => {
-    if (!this.qualifiesForAOTC(student)) return 0
+    if (
+      student.creditElection !== 'aotc' ||
+      student.eligibility.aotc !== 'eligible' ||
+      !this.qualifiesForAOTC(student)
+    ) return 0
     return Math.min(student.qualifiedExpenses, 4000)
   }
 
@@ -70,21 +74,24 @@ export default class F8863 extends F1040Attachment {
   studentLine29 = (student: Student8863): number =>
     Math.round(this.studentLine28(student) * 0.25 * 100) / 100
 
-  // Part III line 30: If line 27 <= $2,000, enter line 27. Otherwise $2,000.
+  // Part III line 30: If line 27 <= $2,000, enter line 27. Otherwise add
+  // $2,000 to line 29. This is the tentative AOTC for the student.
   studentLine30 = (student: Student8863): number => {
     const expenses = this.studentAOTCExpenses(student)
-    return Math.min(expenses, 2000)
+    return expenses <= 2000 ? expenses : 2000 + this.studentLine29(student)
   }
 
-  // Part III line 31: AOTC per student = line 29 + line 30
-  studentAOTC = (student: Student8863): number =>
-    this.studentLine29(student) + this.studentLine30(student)
+  // Part III line 30 is the tentative AOTC per student.
+  studentAOTC = (student: Student8863): number => this.studentLine30(student)
 
   // --- LLC per-student amounts ---
 
-  // LLC-eligible students: those not claiming AOTC
+  // Line 31 LLC expenses are included only when the CPA explicitly elected LLC.
   studentLLCExpenses = (student: Student8863): number => {
-    if (this.qualifiesForAOTC(student)) return 0
+    if (
+      student.creditElection !== 'llc' ||
+      student.eligibility.llc !== 'eligible'
+    ) return 0
     return student.qualifiedExpenses
   }
 
@@ -263,19 +270,18 @@ export default class F8863 extends F1040Attachment {
     // Part III: student for this copy (one student per PDF page)
     const s = this.data.students[this._studentIndex] as Student8863 | undefined
     const studentSsn = s ? this.ssnParts(s.ssn) : ['', '', '']
-    const einA = s ? this.einDigits(s.institutionEIN) : Array(9).fill('')
+    const einA: string[] = s
+      ? this.einDigits(s.institutionEIN)
+      : Array<string>(9).fill('')
 
     // Determine AOTC or LLC values for Part III lines 27-31
-    const isAOTC = s ? this.qualifiesForAOTC(s) : false
-    const l27 = s ? this.studentAOTCExpenses(s) : undefined
-    const l28 = s ? this.studentLine28(s) : undefined
-    const l29 = s ? this.studentLine29(s) : undefined
-    const l30 = s ? this.studentLine30(s) : undefined
-    const l31 = s
-      ? isAOTC
-        ? this.studentAOTC(s)
-        : this.studentLLCExpenses(s)
-      : undefined
+    const isAOTC = s?.creditElection === 'aotc'
+    const isLLC = s?.creditElection === 'llc'
+    const l27 = isAOTC ? this.studentAOTCExpenses(s) : undefined
+    const l28 = isAOTC ? this.studentLine28(s) : undefined
+    const l29 = isAOTC ? this.studentLine29(s) : undefined
+    const l30 = isAOTC ? this.studentLine30(s) : undefined
+    const l31 = isLLC ? this.studentLLCExpenses(s) : undefined
 
     return [
       // ===== Page 1 (indices 0-25) =====
@@ -365,14 +371,14 @@ export default class F8863 extends F1040Attachment {
 
       // Lines 23-26: Student-level Yes/No questions
       // Each pair [0]=[Yes/StudentA], [1]=[No/StudentB]
-      s ? (s.receivedAOTCPriorYears >= 4) : undefined, // 64: c2_5[0] — Line 23 Yes
-      s ? (s.receivedAOTCPriorYears < 4) : undefined,  // 65: c2_5[1] — Line 23 No
-      s?.wasAtLeastHalfTime,                           // 66: c2_6[0] — Line 24 Yes
-      s ? !s.wasAtLeastHalfTime : undefined,           // 67: c2_6[1] — Line 24 No
-      s ? !s.hasCompletedFourYears : undefined,        // 68: c2_7[0] — Line 25 Yes
-      s?.hasCompletedFourYears,                        // 69: c2_7[1] — Line 25 No
-      s?.hasBeenConvictedOfFelonyDrug,                 // 70: c2_8[0] — Line 26 Yes
-      s ? !s.hasBeenConvictedOfFelonyDrug : undefined, // 71: c2_8[1] — Line 26 No
+      isAOTC ? (s.receivedAOTCPriorYears >= 4) : undefined, // 64: c2_5[0] — Line 23 Yes
+      isAOTC ? (s.receivedAOTCPriorYears < 4) : undefined,  // 65: c2_5[1] — Line 23 No
+      isAOTC ? s.wasAtLeastHalfTime : undefined,            // 66: c2_6[0] — Line 24 Yes
+      isAOTC ? !s.wasAtLeastHalfTime : undefined,           // 67: c2_6[1] — Line 24 No
+      isAOTC ? !s.hasCompletedFourYears : undefined,        // 68: c2_7[0] — Line 25 Yes
+      isAOTC ? s.hasCompletedFourYears : undefined,         // 69: c2_7[1] — Line 25 No
+      isAOTC ? s.hasBeenConvictedOfFelonyDrug : undefined,  // 70: c2_8[0] — Line 26 Yes
+      isAOTC ? !s.hasBeenConvictedOfFelonyDrug : undefined, // 71: c2_8[1] — Line 26 No
 
       // Lines 27-31: AOTC / LLC calculation
       l27,                                             // 72: f2_31 — Line 27

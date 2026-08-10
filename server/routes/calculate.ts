@@ -1,11 +1,17 @@
 import { Router, Request, Response } from 'express'
-import { Information, Asset, TaxYear } from 'ustaxes/core/data'
+import {
+  Information,
+  Asset,
+  TaxYear,
+  USTAXES_HTTP_CONTRACT_VERSION
+} from 'ustaxes/core/data'
 import { Either, run } from 'ustaxes/core/util'
 import { deserializeInformation, deserializeAssets } from '../utils/date-serializer'
 import { yearFormBuilder } from 'ustaxes/forms/YearForms'
 import { createPdfDownloader } from '../utils/pdf-downloader'
 import { F1040Error } from 'ustaxes/forms/errors'
 import Form from 'ustaxes/core/irsForms/Form'
+import { validateForm8863Contract } from '../utils/form8863-contract'
 
 // Direct imports for each year's create1040 to access the typed F1040
 import { create1040 as create1040For2020 } from 'ustaxes/forms/Y2020/irsForms/Main'
@@ -41,6 +47,7 @@ function extractSummary(f1040: unknown, forms: Form[]) {
   const f = f1040 as F1040WithSummary
   return {
     success: true as const,
+    contractVersion: USTAXES_HTTP_CONTRACT_VERSION,
     summary: {
       agi: f.l11(),
       taxableIncome: f.l15(),
@@ -99,6 +106,7 @@ router.post('/api/calculate', (req: Request, res: Response) => {
     if (!taxYear || !rawInfo) {
       res.status(400).json({
         success: false,
+        contractVersion: USTAXES_HTTP_CONTRACT_VERSION,
         error: 'Missing required fields: taxYear, information'
       })
       return
@@ -107,7 +115,19 @@ router.post('/api/calculate', (req: Request, res: Response) => {
     if (!VALID_YEARS.includes(taxYear)) {
       res.status(400).json({
         success: false,
+        contractVersion: USTAXES_HTTP_CONTRACT_VERSION,
         error: `Invalid taxYear. Must be one of: ${VALID_YEARS.join(', ')}`
+      })
+      return
+    }
+
+    const contractIssues = validateForm8863Contract(req.body)
+    if (contractIssues.length > 0) {
+      res.status(422).json({
+        success: false,
+        contractVersion: USTAXES_HTTP_CONTRACT_VERSION,
+        error: 'form8863_contract_invalid',
+        issues: contractIssues
       })
       return
     }
@@ -120,7 +140,11 @@ router.post('/api/calculate', (req: Request, res: Response) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('Calculate error:', err instanceof Error ? err.stack : message)
-    res.status(500).json({ success: false, error: message })
+    res.status(500).json({
+      success: false,
+      contractVersion: USTAXES_HTTP_CONTRACT_VERSION,
+      error: message
+    })
   }
 })
 
