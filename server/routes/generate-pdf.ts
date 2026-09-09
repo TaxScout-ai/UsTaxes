@@ -4,6 +4,7 @@ import { USTAXES_HTTP_CONTRACT_VERSION } from 'ustaxes/core/data'
 import { isLeft } from 'ustaxes/core/util'
 import { buildYearForm } from './calculate'
 import { validateForm8863Contract } from '../utils/form8863-contract'
+import { Schedule1AInputError } from 'ustaxes/forms/Y2025/irsForms/schedule1AInput'
 
 const router = Router()
 
@@ -53,6 +54,15 @@ async function generatePdf(req: Request, res: Response): Promise<void> {
     })
     res.send(Buffer.from(pdfBytes))
   } catch (err) {
+    if (err instanceof Schedule1AInputError) {
+      res.status(422).json({
+        success: false,
+        contractVersion: USTAXES_HTTP_CONTRACT_VERSION,
+        error: err.code,
+        issues: [{ path: err.path, code: err.code, message: err.message }]
+      })
+      return
+    }
     const message = err instanceof Error ? err.message : 'Unknown error'
     res.status(500).json({
       success: false,

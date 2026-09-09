@@ -10,12 +10,9 @@ export default class ScheduleSE extends F1040Attachment {
 
   isNeeded = (): boolean =>
     this.f1040.info.scheduleK1Form1065s
-      .map(
-        (k1) =>
-          k1.selfEmploymentEarningsA +
-          k1.selfEmploymentEarningsB +
-          k1.selfEmploymentEarningsC
-      )
+      // Box 14 A is net SE earnings. B/C are gross amounts for optional
+      // methods (Part II), not additional profit under the regular method.
+      .map((k1) => k1.selfEmploymentEarningsA)
       .reduce((a, b) => a + b, 0) > 0 ||
     this.f1040.scheduleCNetProfit() !== 0 ||
     this.f1040.scheduleFNetProfit() !== 0
@@ -38,11 +35,7 @@ export default class ScheduleSE extends F1040Attachment {
 
   l1a = (): number => {
     const schFL34 = this.f1040.scheduleFNetProfit()
-    const k1FarmSE = this.f1040.info.scheduleK1Form1065s.reduce(
-      (c, k1) => c + k1.selfEmploymentEarningsB,
-      0
-    )
-    return schFL34 + k1FarmSE
+    return schFL34
   }
 
   l1b = (): number => 0
@@ -53,11 +46,8 @@ export default class ScheduleSE extends F1040Attachment {
       (c, k1) => c + k1.selfEmploymentEarningsA,
       0
     )
-    const k1SEC = this.f1040.info.scheduleK1Form1065s.reduce(
-      (c, k1) => c + k1.selfEmploymentEarningsC,
-      0
-    )
-    return schCL31 + k1SEA + k1SEC
+    // Same regular-method source as upstream: code A, without adding C again.
+    return schCL31 + k1SEA
   }
 
   l3 = (): number => sumFields([this.l1a(), this.l1b(), this.l2()])
@@ -97,13 +87,13 @@ export default class ScheduleSE extends F1040Attachment {
 
   // Line 8b: Unreported tips subject to social security tax (from Form 4137, line 10)
   l8b = (): number | undefined =>
-    this.l8aRelatedField((): number | undefined =>
-      this.f1040.f4137?.l10() ?? undefined
+    this.l8aRelatedField(
+      (): number | undefined => this.f1040.f4137?.l10() ?? undefined
     )
   // Line 8c: Wages subject to social security tax (from Form 8919, line 10)
   l8c = (): number | undefined =>
-    this.l8aRelatedField((): number | undefined =>
-      this.f1040.f8919?.l10() ?? undefined
+    this.l8aRelatedField(
+      (): number | undefined => this.f1040.f8919?.l10() ?? undefined
     )
   l8d = (): number | undefined =>
     this.l8aRelatedField((): number =>
@@ -154,9 +144,9 @@ export default class ScheduleSE extends F1040Attachment {
     this.l12(),
     this.l13(),
     // 2025: 4 new fields on page 2
-    undefined,                     // [23] f2_1
-    undefined,                     // [24] f2_2
-    undefined,                     // [25] f2_3
-    undefined                      // [26] f2_4
+    undefined, // [23] f2_1
+    undefined, // [24] f2_2
+    undefined, // [25] f2_3
+    undefined // [26] f2_4
   ]
 }

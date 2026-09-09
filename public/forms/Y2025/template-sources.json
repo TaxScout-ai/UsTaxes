@@ -54,5 +54,13 @@
     "pages": 2,
     "fields": 89,
     "taxYearVerified": 2025
+  },
+  {
+    "tag": "f1040s1a",
+    "url": "https://www.irs.gov/pub/irs-pdf/f1040s1a.pdf",
+    "sha256": "64f97b38ff4218e2f188fd55a8aab7043556687487c82bbefe0b6dd1a956ecd4",
+    "pages": 2,
+    "fields": 54,
+    "taxYearVerified": 2025
   }
 ]

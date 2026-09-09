@@ -84,6 +84,10 @@ export const F1040_FIELDS: Record<string, string> = {
   line_11: 'f1_75', // AGI
 
   // Page 2
+  born_before_1961_01_02: 'c2_5',
+  blind: 'c2_6',
+  spouse_born_before_1961_01_02: 'c2_7',
+  spouse_blind: 'c2_8',
   line_11b: 'f2_01',
   line_12: 'f2_02', // Deductions
   line_13a: 'f2_03', // QBI

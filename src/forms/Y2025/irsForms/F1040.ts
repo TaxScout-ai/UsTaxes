@@ -7,8 +7,9 @@ import {
   PlanType1099,
   Asset
 } from 'ustaxes/core/data'
-import federalBrackets, { CURRENT_YEAR } from '../data/federal'
+import federalBrackets from '../data/federal'
 import { F1040_FIELDS } from '../fieldMaps'
+import { seniorAtDeath, seniorAtYearEnd } from './schedule1AInput'
 import F4972 from './F4972'
 import F5695 from './F5695'
 import F8814 from './F8814'
@@ -465,16 +466,27 @@ export default class F1040 extends F1040Base {
     return [this, ...res].sort((a, b) => a.sequenceIndex - b.sequenceIndex)
   }
 
-  // born before 1959/01/02
-  bornBeforeDate = (): boolean =>
-    this.info.taxPayer.primaryPerson.dateOfBirth <
-    new Date(CURRENT_YEAR - 64, 0, 2)
+  // Civil-date cutoff must not move when the server's time zone changes.
+  bornBeforeDate = (): boolean => {
+    const birth = this.info.taxPayer.primaryPerson.dateOfBirth
+    const facts = this.info.schedule1AData?.people?.primary
+    return (
+      seniorAtYearEnd(birth) &&
+      (facts === undefined || seniorAtDeath(birth, facts))
+    )
+  }
 
   blind = (): boolean => this.info.taxPayer.primaryPerson.isBlind
 
-  spouseBeforeDate = (): boolean =>
-    (this.info.taxPayer.spouse?.dateOfBirth ?? new Date()) <
-    new Date(CURRENT_YEAR - 64, 0, 2)
+  spouseBeforeDate = (): boolean => {
+    const birth = this.info.taxPayer.spouse?.dateOfBirth
+    const facts = this.info.schedule1AData?.people?.spouse
+    return (
+      birth !== undefined &&
+      seniorAtYearEnd(birth) &&
+      (facts === undefined || seniorAtDeath(birth, facts))
+    )
+  }
 
   spouseBlind = (): boolean => this.info.taxPayer.spouse?.isBlind ?? false
 
@@ -662,7 +674,7 @@ export default class F1040 extends F1040Base {
   }
 
   l13 = (): number | undefined => this.f8995?.deductions()
-  // Line 13b: Schedule 1-A additional deductions (TY2026+)
+  // Line 13b: Schedule 1-A additional deductions (TY2025)
   l13b = (): number | undefined => this.schedule1A?.deduction()
   l14 = (): number => sumFields([this.l12(), this.l13(), this.l13b()])
 
@@ -908,7 +920,7 @@ export default class F1040 extends F1040Base {
     // Helper: set a value using the named map
     const set = (key: string, value: Field) => {
       const pdfField = fm[key]
-      if (pdfField && value !== undefined && value !== null) {
+      if (pdfField && value !== undefined) {
         vals[pdfField] = value
       }
     }
@@ -934,7 +946,7 @@ export default class F1040 extends F1040Base {
     set('zip', this.info.taxPayer.primaryPerson.address.zip)
 
     // Filing status (radio select)
-    const fsMap: Record<string, number> = {
+    const fsMap: Record<FilingStatus, number> = {
       [FilingStatus.S]: 0,
       [FilingStatus.MFJ]: 1,
       [FilingStatus.MFS]: 2,
@@ -942,9 +954,7 @@ export default class F1040 extends F1040Base {
       [FilingStatus.W]: 4
     }
     const fsIdx = fsMap[this.info.taxPayer.filingStatus]
-    if (fsIdx !== undefined) {
-      vals[fm.filing_status] = { select: fsIdx }
-    }
+    vals[fm.filing_status] = { select: fsIdx }
     if (this.info.taxPayer.filingStatus === FilingStatus.MFS) {
       set('mfs_spouse_name', this.spouseFullName())
     }
@@ -986,9 +996,21 @@ export default class F1040 extends F1040Base {
     set('line_11', this.l11())
 
     // Page 2
+    set('born_before_1961_01_02', this.bornBeforeDate())
+    set(
+      'spouse_born_before_1961_01_02',
+      this.info.taxPayer.filingStatus === FilingStatus.MFJ &&
+        this.spouseBeforeDate()
+    )
+    set('blind', this.blind())
+    set(
+      'spouse_blind',
+      this.info.taxPayer.filingStatus === FilingStatus.MFJ && this.spouseBlind()
+    )
     set('line_11b', this.l11())
     set('line_12', this.l12())
     set('line_13a', this.l13())
+    set('line_13b', this.l13b())
     set('line_14', this.l14())
     set('line_15', this.l15())
     set('line_16', this.l16())

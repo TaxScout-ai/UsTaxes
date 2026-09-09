@@ -151,14 +151,13 @@ export const fix5 = fixDecimals(5)
 export const fix10 = fixDecimals(10)
 
 export const parseFormNumber = (x: string | undefined): number | undefined => {
-  if (x !== undefined && x.length > 0) {
-    try {
-      return parseFloat(x)
-    } catch (e) {
-      return undefined
-    }
-  }
-  return undefined
+  // Upstream 13d27874 fixes parseFloat's NaN result (it never throws).
+  // Also reject partial parses and infinities rather than losing input silently.
+  const value = x?.trim()
+  if (!value || !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(value))
+    return undefined
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : undefined
 }
 
 export const parseFormNumberOrThrow = (x: string | undefined): number => {

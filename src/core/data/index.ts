@@ -464,9 +464,9 @@ export interface ScheduleK1Form1065 {
   interestIncome: number // Form 1040, line 2b
   guaranteedPaymentsForServices: number // Schedule E (Form 1040), line 28, column (k)
   guaranteedPaymentsForCapital: number // Schedule E (Form 1040), line 28, column (k)
-  selfEmploymentEarningsA: number // Schedule SE (Form 1040)
-  selfEmploymentEarningsB: number // Schedule SE (Form 1040)
-  selfEmploymentEarningsC: number // Schedule SE (Form 1040)
+  selfEmploymentEarningsA: number // Box 14 A: net SE earnings (loss), regular method
+  selfEmploymentEarningsB: number // Box 14 B: gross farming/fishing income, optional method
+  selfEmploymentEarningsC: number // Box 14 C: gross nonfarm income, optional method
   distributionsCodeAAmount: number // If the amount shown as code A exceeds the adjusted basis of your partnership interest immediately before the distribution, the excess is treated as gain from the sale or exchange of your partnership interest. Generally, this gain is treated as gain from the sale of a capital asset and should be reported on Form 8949 and the Schedule D for your return.
   section199AQBI: number // Form 8995 or 8995-A
   shortTermCapitalGains?: number // Box 8 — Schedule D, line 5
@@ -1126,12 +1126,35 @@ export interface Form8814Data {
   taxExemptInterest?: number // Line 1b: Tax-exempt interest
 }
 
-// --- Schedule 1-A (Additional Deductions — TY2026+) ---
+// --- Schedule 1-A (Additional Deductions — TY2025) ---
+export interface Schedule1APersonFacts {
+  // Specific facts required by the 2025 instructions; never inferred from SSN shape.
+  ssnValidForEmployment: boolean
+  ssnIssuedByReturnDeadline: boolean // Including extensions
+  dateOfDeath: string | null // ISO calendar date; explicit null means living
+}
+
 export interface Schedule1AData {
+  // Qualified amounts below are prepared worksheet inputs, not raw payroll.
+  // Qualification of the occupation, FLSA premium, loan and vehicle is external.
+  // Explicit zeros establish that territorial exclusions are absent.
+  incomeExclusions?: { puertoRico: number; form4563: number }
+  people?: {
+    primary?: Schedule1APersonFacts
+    spouse?: Schedule1APersonFacts
+  }
+  tipRecipients?: Array<'primary' | 'spouse'>
+  overtimeRecipients?: Array<'primary' | 'spouse'>
   // Part II: No Tax on Tips
   qualifiedTipsW2?: number // Line 4a: qualified tips on W-2 box 7
   qualifiedTipsF4137?: number // Line 4b: qualified tips on Form 4137
   qualifiedTipsSelfEmployed?: number // Line 5: qualified tips from 1099-NEC/MISC
+  // Per-employer maxima, not max(sum(W-2), sum(4137)). Mutually exclusive
+  // with the legacy single-employer line 4a/4b inputs above.
+  employeeTips?: Array<{ reportedTips: number; form4137Tips: number }>
+  // Net income after all deductions allocable to this particular business,
+  // including deductible SE tax, retirement and health insurance (i1040gi).
+  businessTips?: Array<{ qualifiedTips: number; netIncome: number }>
   // Part III: No Tax on Overtime
   qualifiedOvertimeW2?: number // Line 14a: qualified overtime from W-2
   qualifiedOvertime1099?: number // Line 14b: qualified overtime from 1099-NEC/MISC
@@ -1142,8 +1165,8 @@ export interface Schedule1AData {
     interestForSchedule1A: number // (iii) Schedule 1-A deduction
   }>
   // Part V: Enhanced Deduction for Seniors
-  primaryBornBefore1962?: boolean // born before Jan 2, 1962
-  spouseBornBefore1962?: boolean // spouse born before Jan 2, 1962
+  primaryBornBefore1962?: boolean // Deprecated; rejected for TY2025. Use person DOB.
+  spouseBornBefore1962?: boolean // Deprecated; rejected for TY2025. Use person DOB.
 }
 
 // --- Form 8801 (Credit for Prior Year Minimum Tax) ---
