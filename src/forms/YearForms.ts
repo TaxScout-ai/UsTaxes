@@ -1,3 +1,4 @@
+import { Field } from 'ustaxes/core/pdfFiller'
 import { Information, Asset } from 'ustaxes/core/data'
 import { Either, isLeft, isRight, left, run, runAsync } from 'ustaxes/core/util'
 import { TaxYear } from 'ustaxes/core/data'
@@ -82,23 +83,26 @@ export class YearCreateForm {
   f1040Pdfs = async (): Promise<Either<string[], PDFDocument[]>> => {
     const r1 = await run(this.f1040()).mapAsync((forms) =>
       Promise.all(
-        forms.map(async (form) => {
-          const pdf = await this.config.getPDF(form)
-          // Y2025+: Use named field mapping if available
-          if ('namedFields' in form && typeof (form as any).namedFields === 'function') {
-            return fillPDFByName(
-              pdf,
-              (form as any).namedFields(),
-              form.tag
-            )
-          }
-          // Legacy: positional array (tolerant mode)
-          return fillPDF(
-            pdf,
-            form.renderedFields(),
-            form.tag
-          )
-        })
+        [...forms]
+          .sort((a, b) => Number(b.tag === 'f1040') - Number(a.tag === 'f1040'))
+          .map(async (form) => {
+            const pdf = await this.config.getPDF(form)
+            // Y2025+: Use named field mapping if available
+            if (
+              'namedFields' in form &&
+              typeof form.namedFields === 'function'
+            ) {
+              return fillPDFByName(
+                pdf,
+                (
+                  form as Form & { namedFields: () => Record<string, Field> }
+                ).namedFields(),
+                form.tag
+              )
+            }
+            // Legacy: positional array (tolerant mode)
+            return fillPDF(pdf, form.renderedFields(), form.tag)
+          })
       )
     )
     return r1.value()

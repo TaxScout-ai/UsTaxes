@@ -1,4 +1,11 @@
-import { PDFDocument } from 'pdf-lib'
+import {
+  PDFDocument,
+  PDFDict,
+  PDFRef,
+  PDFName,
+  PDFString,
+  PDFHexString
+} from 'pdf-lib'
 import Fill from './Fill'
 import { fillPDF } from './fillPdf'
 
@@ -20,12 +27,46 @@ export const combinePdfs = async (
   const [head, ...rest] = await Promise.all(
     pdfFiles.map(async (pdf) => PDFDocument.load(await pdf.save()))
   )
+  if (!head) throw new Error('Cannot combine an empty PDF packet')
 
   // Make sure we combine the documents from left to right and preserve order
-  return rest.reduce(async (l, r) => {
+  return rest.reduce(async (l, r, index) => {
     const doc = await PDFDocument.load(await (await l).save())
     return await doc.copyPages(r, r.getPageIndices()).then((pgs) => {
-      pgs.forEach((p) => doc.addPage(p))
+      const roots = new Map<string, PDFRef>()
+      for (const page of pgs) {
+        doc.addPage(page)
+        // copyPages copies widget annotations but does not register their field
+        // trees in the target AcroForm. Register each copied root exactly once.
+        for (const entry of page.node.Annots()?.asArray() ?? []) {
+          if (!(entry instanceof PDFRef)) continue
+          let ref = entry
+          let field = doc.context.lookup(ref, PDFDict)
+          if (field.get(PDFName.of('Subtype')) !== PDFName.of('Widget'))
+            continue
+          const visited = new Set<string>()
+          while (field.has(PDFName.of('Parent'))) {
+            if (visited.has(ref.toString()))
+              throw new Error('Cyclic PDF field tree')
+            visited.add(ref.toString())
+            ref = field.get(PDFName.of('Parent')) as PDFRef
+            field = doc.context.lookup(ref, PDFDict)
+          }
+          roots.set(ref.toString(), ref)
+        }
+      }
+      for (const ref of Array.from(roots.values())) {
+        const field = doc.context.lookup(ref, PDFDict)
+        const name = field.get(PDFName.of('T'))
+        if (!(name instanceof PDFString) && !(name instanceof PDFHexString))
+          throw new Error('Imported PDF field root has no name')
+        // IRS forms reuse topmostSubform. A prefix prevents cross-form aliasing.
+        field.set(
+          PDFName.of('T'),
+          PDFHexString.fromText(`attachment_${index + 1}_${name.decodeText()}`)
+        )
+        doc.getForm().acroForm.addField(ref)
+      }
       return doc
     })
   }, Promise.resolve(head))

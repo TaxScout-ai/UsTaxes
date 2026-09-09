@@ -51,7 +51,8 @@ export default class Schedule2 extends F1040Attachment {
   l8 = (): number | undefined => undefined // TODO: additional tax on IRAs or other tax favored accoutns, form 5329
   l9 = (): number | undefined => undefined // TODO: household employment taxes, schedule H
   l10 = (): number | undefined => undefined // repayment of firsttime homebuyer credit, form 5405
-  l11 = (): number | undefined => this.f1040.f8959.toSchedule2l11()
+  l11 = (): number | undefined =>
+    this.f1040.f8959.isNeeded() ? this.f1040.f8959.toSchedule2l11() : undefined
   l12 = (): number | undefined => this.f1040.f8960.toSchedule2l12()
   // Line 13: Uncollected SS/Medicare from W-2 box 12 codes A and B
   l13 = (): number | undefined => {
@@ -175,7 +176,8 @@ export default class Schedule2 extends F1040Attachment {
     const fm = SCHEDULE2_FIELDS
     const vals: Record<string, Field> = {}
     const set = (key: string, value: Field) => {
-      const f = fm[key]; if (f && value !== undefined && value !== null) vals[f] = value
+      const f = fm[key]
+      if (f && value !== undefined && value !== null) vals[f] = value
     }
     set('name', this.f1040.namesString())
     set('ssn', this.f1040.info.taxPayer.primaryPerson.ssid)
@@ -220,69 +222,69 @@ export default class Schedule2 extends F1040Attachment {
 
   // 2025 Schedule 2 — 63 fields (12 checkboxes interspersed)
   fields = (): Field[] => [
-    this.f1040.namesString(),                    // [ 0] f1_01 name
-    this.f1040.info.taxPayer.primaryPerson.ssid,  // [ 1] f1_02 SSN
-    this.l1a(),                                   // [ 2] f1_03 line 1a AMT
-    this.l1b(),                                   // [ 3] f1_04 line 1b excess premium tax
-    this.l1c(),                                   // [ 4] f1_05 line 1c
-    this.l1d(),                                   // [ 5] f1_06 line 1d
-    this.l1ei(),                                  // [ 6] c1_1  line 1e checkbox i
-    this.l1eii(),                                 // [ 7] c1_1[1] line 1e checkbox ii
-    this.l1eiii(),                                // [ 8] c1_1[2] line 1e checkbox iii
-    this.l1eiv(),                                 // [ 9] c1_1[3] line 1e checkbox iv
-    this.l1e(),                                   // [10] f1_07 line 1e amount
-    this.l1fi(),                                  // [11] c1_2  line 1f checkbox i
-    this.l1fii(),                                 // [12] c1_2[1] line 1f checkbox ii
-    this.l1fiii(),                                // [13] c1_2[2] line 1f checkbox iii
-    this.l1fiv(),                                 // [14] c1_2[3] line 1f checkbox iv
-    this.l1f(),                                   // [15] f1_08 line 1f amount
-    this.l1y(),                                   // [16] f1_09 line 1y
-    this.l1z(),                                   // [17] f1_10 line 1z
-    this.l2(),                                    // [18] f1_11 line 2
-    this.l3(),                                    // [19] f1_12 line 3
-    this.l4(),                                    // [20] f1_13 line 4
-    false,                                        // [21] c1_3  line 4 checkbox (8959)
-    false,                                        // [22] c1_4  line 4 checkbox (8960)
-    false,                                        // [23] c1_5  line 4 checkbox (other)
-    this.l5(),                                    // [24] f1_14 line 5
-    this.l6(),                                    // [25] f1_15 line 6
-    this.l7(),                                    // [26] f1_16 line 7
-    this.l8(),                                    // [27] f1_17 line 8
-    this.l9(),                                    // [28] f1_18 line 9
-    this.l8box(),                                 // [29] c1_6  line 8 checkbox
-    this.l10(),                                   // [30] f1_19 line 10
-    this.l11(),                                   // [31] f1_20 line 11
-    this.l12(),                                   // [32] f1_21 line 12
-    this.l13(),                                   // [33] f1_22 line 13
-    this.l14(),                                   // [34] f1_23 line 14
-    this.l15(),                                   // [35] f1_24 line 15
-    this.l16(),                                   // [36] f1_25 line 16
-    this.l17aDesc(),                              // [37] f1_26 line 17a desc
-    this.l17a(),                                  // [38] f1_27 line 17a
+    this.f1040.namesString(), // [ 0] f1_01 name
+    this.f1040.info.taxPayer.primaryPerson.ssid, // [ 1] f1_02 SSN
+    this.l1a(), // [ 2] f1_03 line 1a AMT
+    this.l1b(), // [ 3] f1_04 line 1b excess premium tax
+    this.l1c(), // [ 4] f1_05 line 1c
+    this.l1d(), // [ 5] f1_06 line 1d
+    this.l1ei(), // [ 6] c1_1  line 1e checkbox i
+    this.l1eii(), // [ 7] c1_1[1] line 1e checkbox ii
+    this.l1eiii(), // [ 8] c1_1[2] line 1e checkbox iii
+    this.l1eiv(), // [ 9] c1_1[3] line 1e checkbox iv
+    this.l1e(), // [10] f1_07 line 1e amount
+    this.l1fi(), // [11] c1_2  line 1f checkbox i
+    this.l1fii(), // [12] c1_2[1] line 1f checkbox ii
+    this.l1fiii(), // [13] c1_2[2] line 1f checkbox iii
+    this.l1fiv(), // [14] c1_2[3] line 1f checkbox iv
+    this.l1f(), // [15] f1_08 line 1f amount
+    this.l1y(), // [16] f1_09 line 1y
+    this.l1z(), // [17] f1_10 line 1z
+    this.l2(), // [18] f1_11 line 2
+    this.l3(), // [19] f1_12 line 3
+    this.l4(), // [20] f1_13 line 4
+    false, // [21] c1_3  line 4 checkbox (8959)
+    false, // [22] c1_4  line 4 checkbox (8960)
+    false, // [23] c1_5  line 4 checkbox (other)
+    this.l5(), // [24] f1_14 line 5
+    this.l6(), // [25] f1_15 line 6
+    this.l7(), // [26] f1_16 line 7
+    this.l8(), // [27] f1_17 line 8
+    this.l9(), // [28] f1_18 line 9
+    this.l8box(), // [29] c1_6  line 8 checkbox
+    this.l10(), // [30] f1_19 line 10
+    this.l11(), // [31] f1_20 line 11
+    this.l12(), // [32] f1_21 line 12
+    this.l13(), // [33] f1_22 line 13
+    this.l14(), // [34] f1_23 line 14
+    this.l15(), // [35] f1_24 line 15
+    this.l16(), // [36] f1_25 line 16
+    this.l17aDesc(), // [37] f1_26 line 17a desc
+    this.l17a(), // [38] f1_27 line 17a
     // Page 2
-    this.l17b(),                                  // [39] f2_01 line 17b (17a desc cont)
-    this.l17b(),                                  // [40] f2_02 line 17b
-    this.l17c(),                                  // [41] f2_03
-    this.l17d(),                                  // [42] f2_04
-    this.l17e(),                                  // [43] f2_05
-    this.l17f(),                                  // [44] f2_06
-    this.l17g(),                                  // [45] f2_07
-    this.l17h(),                                  // [46] f2_08
-    this.l17i(),                                  // [47] f2_09
-    this.l17j(),                                  // [48] f2_10
-    this.l17k(),                                  // [49] f2_11
-    this.l17l(),                                  // [50] f2_12
-    this.l17m(),                                  // [51] f2_13
-    this.l17n(),                                  // [52] f2_14
-    this.l17o(),                                  // [53] f2_15
-    this.l17p(),                                  // [54] f2_16
-    this.l17q(),                                  // [55] f2_17
-    this.l17zDesc(),                              // [56] f2_18
-    this.l17z(),                                  // [57] f2_19 line 17z
-    this.l18(),                                   // [58] f2_20 line 18
-    undefined,                                    // [59] f2_21 line 19
-    this.l20(),                                   // [60] f2_22 line 20
-    this.l21(),                                   // [61] f2_23 line 21
-    undefined                                     // [62] f2_24
+    this.l17b(), // [39] f2_01 line 17b (17a desc cont)
+    this.l17b(), // [40] f2_02 line 17b
+    this.l17c(), // [41] f2_03
+    this.l17d(), // [42] f2_04
+    this.l17e(), // [43] f2_05
+    this.l17f(), // [44] f2_06
+    this.l17g(), // [45] f2_07
+    this.l17h(), // [46] f2_08
+    this.l17i(), // [47] f2_09
+    this.l17j(), // [48] f2_10
+    this.l17k(), // [49] f2_11
+    this.l17l(), // [50] f2_12
+    this.l17m(), // [51] f2_13
+    this.l17n(), // [52] f2_14
+    this.l17o(), // [53] f2_15
+    this.l17p(), // [54] f2_16
+    this.l17q(), // [55] f2_17
+    this.l17zDesc(), // [56] f2_18
+    this.l17z(), // [57] f2_19 line 17z
+    this.l18(), // [58] f2_20 line 18
+    undefined, // [59] f2_21 line 19
+    this.l20(), // [60] f2_22 line 20
+    this.l21(), // [61] f2_23 line 21
+    undefined // [62] f2_24
   ]
 }

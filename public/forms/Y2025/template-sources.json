@@ -1,0 +1,58 @@
+[
+  {
+    "tag": "f8582",
+    "url": "https://www.irs.gov/pub/irs-pdf/f8582.pdf",
+    "sha256": "d929884fe07b58aca9561aefbfe9fe2196d9e8526b4726e49460589501080537",
+    "pages": 3,
+    "fields": 205,
+    "taxYearVerified": 2025
+  },
+  {
+    "tag": "f1040sc",
+    "url": "https://www.irs.gov/pub/irs-pdf/f1040sc.pdf",
+    "sha256": "ddf401dbe060467d39f90ad2abf645df1de31512821a150dc68a3882bbf19716",
+    "pages": 2,
+    "fields": 105,
+    "taxYearVerified": 2025
+  },
+  {
+    "tag": "f8863",
+    "url": "https://www.irs.gov/pub/irs-pdf/f8863.pdf",
+    "sha256": "a251a1cfbd613d5dd81646b276b1cc3562d7efb8bed969491eada7c8eb0d8e00",
+    "pages": 2,
+    "fields": 77,
+    "taxYearVerified": 2025
+  },
+  {
+    "tag": "f5695",
+    "url": "https://www.irs.gov/pub/irs-pdf/f5695.pdf",
+    "sha256": "e2ac6a5c4b39e9032d3716827992fc0de46289a951e8b1ffaa3d5a969278baf2",
+    "pages": 4,
+    "fields": 167,
+    "taxYearVerified": 2025
+  },
+  {
+    "tag": "f8962",
+    "url": "https://www.irs.gov/pub/irs-pdf/f8962.pdf",
+    "sha256": "dc7d2c6b566cac66badae721e2ce47ac47bb4e8b71aafb01721ff7368d803099",
+    "pages": 2,
+    "fields": 141,
+    "taxYearVerified": 2025
+  },
+  {
+    "tag": "f8880",
+    "url": "https://www.irs.gov/pub/irs-pdf/f8880.pdf",
+    "sha256": "ba2b28770bc82d318ab0b884e56a572771030ce1a3ec80d85bafd2eea3a2778e",
+    "pages": 2,
+    "fields": 23,
+    "taxYearVerified": 2025
+  },
+  {
+    "tag": "f1040sf",
+    "url": "https://www.irs.gov/pub/irs-pdf/f1040sf.pdf",
+    "sha256": "c6f7f19e1a4f5729515b2ac4604a06e0c2215043fdf94ad0f914f76396d7ec09",
+    "pages": 2,
+    "fields": 89,
+    "taxYearVerified": 2025
+  }
+]

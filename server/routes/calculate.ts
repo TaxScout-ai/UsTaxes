@@ -1,3 +1,6 @@
+import F1040For2025 from 'ustaxes/forms/Y2025/irsForms/F1040'
+import { calculationSnapshot } from 'ustaxes/forms/Y2025/irsForms/calculationSnapshot'
+import { parseCalculationRequest } from '../utils/calculation-contract'
 import { Router, Request, Response } from 'express'
 import {
   Information,
@@ -6,7 +9,10 @@ import {
   USTAXES_HTTP_CONTRACT_VERSION
 } from 'ustaxes/core/data'
 import { Either, run } from 'ustaxes/core/util'
-import { deserializeInformation, deserializeAssets } from '../utils/date-serializer'
+import {
+  deserializeInformation,
+  deserializeAssets
+} from '../utils/date-serializer'
 import { yearFormBuilder } from 'ustaxes/forms/YearForms'
 import { createPdfDownloader } from '../utils/pdf-downloader'
 import { F1040Error } from 'ustaxes/forms/errors'
@@ -22,25 +28,21 @@ import { create1040 as create1040For2024 } from 'ustaxes/forms/Y2024/irsForms/Ma
 import { create1040 as create1040For2025 } from 'ustaxes/forms/Y2025/irsForms/Main'
 import { create1040 as create1040For2026 } from 'ustaxes/forms/Y2026/irsForms/Main'
 
-const VALID_YEARS: TaxYear[] = [
-  'Y2020', 'Y2021', 'Y2022', 'Y2023', 'Y2024', 'Y2025', 'Y2026'
-]
-
 /**
  * All F1040 classes share these methods but they're not in the base class.
  * This interface lets us extract summary data from any year's F1040.
  */
 interface F1040WithSummary {
-  l11(): number     // AGI
-  l12(): number     // Deductions (standard or itemized)
-  l15(): number     // Taxable income
-  l24(): number     // Total tax
-  l32(): number     // Total credits (other payments + refundable)
-  l33(): number     // Total payments
-  l35a(): number    // Refund amount
-  l37(): number     // Amount owed
+  l11(): number // AGI
+  l12(): number // Deductions (standard or itemized)
+  l15(): number // Taxable income
+  l24(): number // Total tax
+  l32(): number // Total credits (other payments + refundable)
+  l33(): number // Total payments
+  l35a(): number // Refund amount
+  l37(): number // Amount owed
   standardDeduction(): number | undefined
-  totalForeignTaxCredit(): number  // Sum of all F1116 Line 24
+  totalForeignTaxCredit(): number // Sum of all F1116 Line 24
 }
 
 function extractSummary(f1040: unknown, forms: Form[]) {
@@ -60,6 +62,9 @@ function extractSummary(f1040: unknown, forms: Form[]) {
       foreignTaxCredit: f.totalForeignTaxCredit(),
       totalPayments: f.l33()
     },
+    ...(f1040 instanceof F1040For2025
+      ? { returnLines: calculationSnapshot(f1040) }
+      : {}),
     forms: forms.map((form) => ({
       tag: form.tag,
       sequenceIndex: form.sequenceIndex
@@ -75,18 +80,37 @@ function calculateForYear(
   taxYear: TaxYear,
   information: Information<Date>,
   assets: Asset<Date>[]
-): { success: true; summary: ReturnType<typeof extractSummary>['summary']; forms: { tag: string; sequenceIndex: number }[] } | { success: false; errors: F1040Error[] } {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let result: Either<F1040Error[], [any, Form[]]>
+):
+  | {
+      success: true
+      summary: ReturnType<typeof extractSummary>['summary']
+      forms: { tag: string; sequenceIndex: number }[]
+    }
+  | { success: false; errors: F1040Error[] } {
+  let result: Either<F1040Error[], [unknown, Form[]]>
 
   switch (taxYear) {
-    case 'Y2020': result = create1040For2020(information, assets); break
-    case 'Y2021': result = create1040For2021(information, assets); break
-    case 'Y2022': result = create1040For2022(information, assets); break
-    case 'Y2023': result = create1040For2023(information, assets); break
-    case 'Y2024': result = create1040For2024(information, assets); break
-    case 'Y2025': result = create1040For2025(information, assets); break
-    case 'Y2026': result = create1040For2026(information, assets); break
+    case 'Y2020':
+      result = create1040For2020(information, assets)
+      break
+    case 'Y2021':
+      result = create1040For2021(information, assets)
+      break
+    case 'Y2022':
+      result = create1040For2022(information, assets)
+      break
+    case 'Y2023':
+      result = create1040For2023(information, assets)
+      break
+    case 'Y2024':
+      result = create1040For2024(information, assets)
+      break
+    case 'Y2025':
+      result = create1040For2025(information, assets)
+      break
+    case 'Y2026':
+      result = create1040For2026(information, assets)
+      break
     default:
       return { success: false, errors: [F1040Error.unsupportedTaxYear] }
   }
@@ -101,25 +125,17 @@ const router = Router()
 
 router.post('/api/calculate', (req: Request, res: Response) => {
   try {
-    const { taxYear, information: rawInfo, assets: rawAssets = [] } = req.body
-
-    if (!taxYear || !rawInfo) {
-      res.status(400).json({
+    const parsed = parseCalculationRequest(req.body)
+    if (!parsed.ok) {
+      res.status(422).json({
         success: false,
         contractVersion: USTAXES_HTTP_CONTRACT_VERSION,
-        error: 'Missing required fields: taxYear, information'
+        error: 'invalid_input',
+        issues: parsed.issues
       })
       return
     }
-
-    if (!VALID_YEARS.includes(taxYear)) {
-      res.status(400).json({
-        success: false,
-        contractVersion: USTAXES_HTTP_CONTRACT_VERSION,
-        error: `Invalid taxYear. Must be one of: ${VALID_YEARS.join(', ')}`
-      })
-      return
-    }
+    const { taxYear, information: rawInfo, assets: rawAssets } = parsed.value
 
     const contractIssues = validateForm8863Contract(req.body)
     if (contractIssues.length > 0) {
@@ -139,7 +155,10 @@ router.post('/api/calculate', (req: Request, res: Response) => {
     res.json(response)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
-    console.error('Calculate error:', err instanceof Error ? err.stack : message)
+    console.error(
+      'Calculate error:',
+      err instanceof Error ? err.stack : message
+    )
     res.status(500).json({
       success: false,
       contractVersion: USTAXES_HTTP_CONTRACT_VERSION,
@@ -154,9 +173,13 @@ export default router
  * Exported for reuse by generate-pdf route.
  * Returns the YearCreateForm builder with filesystem PDF downloader.
  */
-export function buildYearForm(taxYear: TaxYear, rawInfo: unknown, rawAssets: unknown[]) {
-  const information = deserializeInformation(rawInfo as Parameters<typeof deserializeInformation>[0])
-  const assets = deserializeAssets((rawAssets ?? []) as Parameters<typeof deserializeAssets>[0])
+export function buildYearForm(
+  taxYear: TaxYear,
+  rawInfo: Information<string>,
+  rawAssets: Asset<string>[]
+) {
+  const information = deserializeInformation(rawInfo)
+  const assets = deserializeAssets(rawAssets)
 
   const builder = yearFormBuilder(taxYear)
     .setDownloader(createPdfDownloader(taxYear))

@@ -19,6 +19,7 @@ const logsDir = path.resolve(__dirname, '../../../logs/errors')
 
 export default class TestKit {
   year: TaxYear
+  assetArbitrary: fc.Arbitrary<Asset<Date>> = ustarbitraries.positionDate
   downloader: PDFDownloader
   arbitaries: arbitraries.Arbitraries
   builder: CreateForms
@@ -102,12 +103,12 @@ export default class TestKit {
       forms: Form[],
       info: ValidatedInformation,
       assets: Asset<Date>[]
-    ) => Promise<void>,
+    ) => void | Promise<void>,
     filter: (info: ValidatedInformation) => boolean = () => true
   ): fc.IAsyncPropertyWithHooks<[ValidatedInformation, Asset<Date>[]]> =>
     fc.asyncProperty(
       this.arbitaries.information().filter(filter),
-      fc.array(ustarbitraries.positionDate),
+      fc.array(this.assetArbitrary),
       async (information, assets): Promise<void> => {
         const builder = this.builder.build(information, assets)
         await run(builder.f1040()).fold(
@@ -130,7 +131,7 @@ export default class TestKit {
       forms: Form[],
       info: ValidatedInformation,
       assets: Asset<Date>[]
-    ) => Promise<void>,
+    ) => void | Promise<void>,
     params: Parameters<[Information, Asset<Date>[]]> = {},
     filter: (info: ValidatedInformation) => boolean = () => true
   ): Promise<void> => {
@@ -138,16 +139,18 @@ export default class TestKit {
     await fc
       .assert(
         this.with1040Property(async (forms, info, assets) => {
-          await f(forms, info, assets).catch((e) => {
-            // Save the last failing test info for logging
-            lastCallWithInfo = [info, assets]
-            // Hand it back to fc's assert.
-            // We're only saving the last form data after
-            // fast-check has done its shrinking. So we need
-            // fast-check to catch this exception and decide
-            // whether to run it again.
-            throw e
-          })
+          await Promise.resolve()
+            .then(() => f(forms, info, assets))
+            .catch((e) => {
+              // Save the last failing test info for logging
+              lastCallWithInfo = [info, assets]
+              // Hand it back to fc's assert.
+              // We're only saving the last form data after
+              // fast-check has done its shrinking. So we need
+              // fast-check to catch this exception and decide
+              // whether to run it again.
+              throw e
+            })
         }, filter),
         params
       )

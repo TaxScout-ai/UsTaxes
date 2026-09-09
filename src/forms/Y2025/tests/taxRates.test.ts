@@ -5,7 +5,9 @@ import fs from 'fs/promises'
 import { parseCsvOrThrow } from 'ustaxes/data/csvImport'
 
 const getTaxTable = async (): Promise<number[][]> => {
-  const path = './src/forms/Y2024/tests/taxTable.csv'
+  // The TY2025 fixture sits beside this test. Reading the TY2024 copy meant a
+  // change to the previous year's file would silently move these expectations.
+  const path = './src/forms/Y2025/tests/taxTable.csv'
   const taxTableCsv = (await fs.readFile(path)).toString('utf-8')
   return parseCsvOrThrow(taxTableCsv, (r: string[], rowNum) =>
     // ignore heading row.
