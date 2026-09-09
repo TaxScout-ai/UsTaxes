@@ -1,9 +1,18 @@
-import { writeFileSync } from 'node:fs'
+import { existsSync, writeFileSync } from 'node:fs'
+import { parseArgs } from 'node:util'
 import { readOracle } from './oracle'
 import { computeOrdinaryTax } from 'ustaxes/forms/Y2025/irsForms/TaxTable'
 import F1040 from 'ustaxes/forms/Y2025/irsForms/F1040'
 import { FilingStatus, PersonRole } from 'ustaxes/core/data'
 import { blankState } from 'ustaxes/redux/reducer'
+const { values } = parseArgs({
+  options: { output: { type: 'string' } },
+  strict: true,
+  allowPositionals: false
+})
+if (!values.output) throw new Error('Required: --output <new report file>')
+if (existsSync(values.output))
+  throw new Error('Output already exists; preserve prior evidence')
 const table = readOracle(
   'scripts/verification/authority/independent-tax-table.json.gz'
 )
@@ -81,6 +90,8 @@ const result = {
   scope:
     'Line 16 Tax Table: every whole dollar for four columns; five explicit rate-schedule goldens. Does not prove other lines or all filing-status eligibility.'
 }
-writeFileSync(process.argv[2], JSON.stringify(result, null, 2) + '\n')
+writeFileSync(values.output, JSON.stringify(result, null, 2) + '\n', {
+  flag: 'wx'
+})
 console.log(JSON.stringify(result))
 process.exitCode = mismatches.length ? 1 : 0

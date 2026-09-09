@@ -13,7 +13,7 @@ CI=true node_modules/.bin/craco test --watch=false --runInBand src/forms/Y2025/t
 python3 -m venv .verification-venv
 .verification-venv/bin/pip install -r scripts/verification/requirements.txt
 .verification-venv/bin/python scripts/verification/authority/regenerate.py --check
-TS_NODE_PROJECT=tsconfig.server.json node -r ts-node/register/transpile-only -r tsconfig-paths/register scripts/verification/table-sweep.ts scripts/verification/authority/independent-tax-table.json.gz
+TS_NODE_PROJECT=tsconfig.server.json node -r ts-node/register/transpile-only -r tsconfig-paths/register scripts/verification/table-sweep.ts --output /tmp/new-tax-table-report.json
 ```
 
 `http-pdf.ts <new-output-dir> <oracle.gz> <source-manifest.json>` exercises the
