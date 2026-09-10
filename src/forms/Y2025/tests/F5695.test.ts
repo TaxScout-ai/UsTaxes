@@ -1,43 +1,71 @@
-import { commonTests, testKit } from '.'
-import F5695 from '../irsForms/F5695'
+import { readFileSync } from 'fs'
+import { PDFDocument } from 'pdf-lib'
+import { fillPDFByName } from 'ustaxes/core/pdfFiller/fillPdf'
+import F1040 from '../irsForms/F1040'
+import {
+  energyData,
+  energyDetails,
+  rehearsalInformation,
+  scenarioOneVariation
+} from './fixtures/atsRehearsal'
 
-jest.setTimeout(40000)
-
-beforeAll(() => {
-  jest.spyOn(console, 'warn').mockImplementation((x: string) => {
-    if (!x.includes('Removing XFA form data as pdf-lib')) {
-      console.warn(x)
-    }
+const template = () =>
+  PDFDocument.load(
+    readFileSync('public/forms/Y2025/irs/f5695.pdf').toString('base64')
+  )
+describe('F5695 genuine TY2025 PDF binding', () => {
+  it('fills the real form, including QMID fields and the correct subtotal fields', async () => {
+    const f = new F1040(scenarioOneVariation(), []).f5695
+    if (!f) throw new Error('Missing energy form')
+    const pdf = fillPDFByName(await template(), f.namedFields(), f.tag)
+    expect(
+      pdf
+        .getForm()
+        .getTextField('topmostSubform[0].Page2[0].f2_10[0]')
+        .getText()
+    ).toBe('1020')
+    expect(pdf.getPageCount()).toBe(4)
   })
-})
-
-describe('F5695', () => {
-  it('should have clean energy credit = 30% of total expenses', async () => {
-    await testKit.with1040Assert(async (forms, info) => {
-      const f5695 = forms.find((f) => f.tag === 'f5695') as F5695 | undefined
-      if (f5695 && info.form5695) {
-        const totalClean = f5695.pdfL6a()
-        const credit = f5695.pdfL6b()
-        expect(credit).toBeCloseTo(totalClean * 0.3, 0)
-      }
-    })
+  it('resolves both controls that have the same f3_30 leaf without overwriting either', async () => {
+    const f = new F1040(
+      {
+        ...rehearsalInformation(),
+        form5695: energyData({
+          details: energyDetails({
+            waterHeaters: [
+              { qmid: 'T001', cost: 500 },
+              { qmid: 'T002', cost: 400 }
+            ]
+          })
+        })
+      },
+      []
+    ).f5695
+    if (!f) throw new Error('Missing energy form')
+    const pdf = fillPDFByName(await template(), f.namedFields(), f.tag)
+    expect(
+      pdf
+        .getForm()
+        .getTextField('topmostSubform[0].Page3[0].f3_30[0]')
+        .getText()
+    ).toBe('500')
+    expect(
+      pdf
+        .getForm()
+        .getTextField(
+          'topmostSubform[0].Page3[0].Ln23aii[0].Box1-4[0].f3_30[0]'
+        )
+        .getText()
+    ).toBe('T002')
   })
-
-  it('should have Part II credit <= $3,200', async () => {
-    await testKit.with1040Assert(async (forms, info) => {
-      const f5695 = forms.find((f) => f.tag === 'f5695') as F5695 | undefined
-      if (f5695 && info.form5695) {
-        expect(f5695.pdfL30()).toBeLessThanOrEqual(3200)
-      }
-    })
-  })
-
-  it('should produce fields array without error', async () => {
-    await testKit.with1040Assert(async (forms) => {
-      const f5695 = forms.find((f) => f.tag === 'f5695') as F5695 | undefined
-      if (f5695) {
-        expect(() => f5695.fields()).not.toThrow()
-      }
-    })
+  it('refuses missing/ambiguous names and mismatched field types', async () => {
+    const pdf = await template()
+    for (const values of [
+      { missing: 1 },
+      { f3_30: 1 },
+      { f1_08: true },
+      { c1_3: 5 }
+    ])
+      expect(() => fillPDFByName(pdf, values, 'f5695')).toThrow()
   })
 })

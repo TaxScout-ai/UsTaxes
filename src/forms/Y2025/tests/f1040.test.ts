@@ -28,14 +28,16 @@ describe('f1040', () => {
     })
   })
 
-  it('should never produce higher tax than total income', async () => {
+  it('regular income tax after credits does not exceed total income', async () => {
     await testKit.with1040Assert((forms): Promise<void> => {
       const f1040 = commonTests.findF1040(forms)
       expect(f1040).not.toBeUndefined()
       if (f1040 !== undefined) {
-        // Remove line 7 for AMT
+        // Additional taxes (including SE tax) can remain due even when
+        // unrelated income losses reduce 1040 line 9 to zero. Bound regular
+        // income tax only; remove the AMT already included in line 22.
         expect(
-          displayRound(f1040.l24() - (f1040.l17() ?? 0)) ?? 0
+          displayRound(f1040.l22() - (f1040.l17() ?? 0)) ?? 0
         ).toBeLessThanOrEqual(displayRound(Math.max(0, f1040.l9())) ?? 0)
       }
       return Promise.resolve()

@@ -1,3 +1,4 @@
+import { Field } from 'ustaxes/core/pdfFiller'
 import { Information, Asset } from 'ustaxes/core/data'
 import { Either, isLeft, isRight, left, run, runAsync } from 'ustaxes/core/util'
 import { TaxYear } from 'ustaxes/core/data'
@@ -28,6 +29,7 @@ import { createStateReturn as createStateReturn2024 } from 'ustaxes/forms/Y2024/
 import { createStateReturn as createStateReturn2025 } from 'ustaxes/forms/Y2025/stateForms'
 import { createStateReturn as createStateReturn2026 } from 'ustaxes/forms/Y2026/stateForms'
 import { PDFDocument } from 'pdf-lib'
+import { statementsPdf } from 'ustaxes/core/pdfFiller/statements'
 import { fillPDF, fillPDFByName } from 'ustaxes/core/pdfFiller/fillPdf'
 import {
   combinePdfs,
@@ -82,23 +84,31 @@ export class YearCreateForm {
   f1040Pdfs = async (): Promise<Either<string[], PDFDocument[]>> => {
     const r1 = await run(this.f1040()).mapAsync((forms) =>
       Promise.all(
-        forms.map(async (form) => {
-          const pdf = await this.config.getPDF(form)
-          // Y2025+: Use named field mapping if available
-          if ('namedFields' in form && typeof (form as any).namedFields === 'function') {
-            return fillPDFByName(
-              pdf,
-              (form as any).namedFields(),
-              form.tag
-            )
-          }
-          // Legacy: positional array (tolerant mode)
-          return fillPDF(
-            pdf,
-            form.renderedFields(),
-            form.tag
-          )
-        })
+        [...forms]
+          .sort((a, b) => Number(b.tag === 'f1040') - Number(a.tag === 'f1040'))
+          .map(async (form) => {
+            const pdf = await this.config.getPDF(form)
+            // Y2025+: Use named field mapping if available
+            if (
+              'namedFields' in form &&
+              typeof form.namedFields === 'function'
+            ) {
+              fillPDFByName(
+                pdf,
+                (
+                  form as Form & { namedFields: () => Record<string, Field> }
+                ).namedFields(),
+                form.tag
+              )
+            } else {
+              // Legacy: positional array (tolerant mode)
+              fillPDF(pdf, form.renderedFields(), form.tag)
+            }
+            const statements = form.supportingStatements()
+            return statements.length === 0
+              ? pdf
+              : combinePdfs([pdf, await statementsPdf(statements)])
+          })
       )
     )
     return r1.value()

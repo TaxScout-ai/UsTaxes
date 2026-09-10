@@ -1,0 +1,16 @@
+{
+  "taxYear": 2025,
+  "sources": [
+    {
+      "path": "public/forms/Y2025/irs/f1040s1a.pdf",
+      "url": "https://www.irs.gov/pub/irs-pdf/f1040s1a.pdf",
+      "sha256": "64f97b38ff4218e2f188fd55a8aab7043556687487c82bbefe0b6dd1a956ecd4"
+    },
+    {
+      "path": "scripts/verification/authority/i1040gi-2025.pdf",
+      "url": "https://www.irs.gov/pub/irs-pdf/i1040gi.pdf",
+      "sha256": "482e9c487c608f1bbeaceef35bc3c0933e8b35443cfff447e4279d590468364a"
+    }
+  ],
+  "basis": "Schedule 1-A lines 1-38; i1040gi Schedule 1-A instructions including per-employer tips, business net income limits, valid SSNs and age at death. Qualified amounts are prepared inputs; not a certification of their underlying eligibility."
+}

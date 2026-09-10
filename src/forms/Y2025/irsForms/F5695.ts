@@ -1,237 +1,456 @@
 import F1040Attachment from './F1040Attachment'
 import { Field } from 'ustaxes/core/pdfFiller'
-import { FormTag } from 'ustaxes/core/irsForms/Form'
-import { Form5695Data } from 'ustaxes/core/data'
-import { sumFields } from 'ustaxes/core/irsForms/util'
+import { FormStatement } from 'ustaxes/core/irsForms/Form'
+import {
+  Form5695Data,
+  Form5695Details,
+  EnergyPropertyItem
+} from 'ustaxes/core/data'
 import F1040 from './F1040'
+import {
+  establishedBoolean,
+  nonnegativeMoney,
+  TaxFormInputError
+} from './formInput'
+import {
+  MoneyInputError,
+  rateToWholeDollars,
+  sumExactCents,
+  sumToWholeDollars
+} from './rounding'
 
-/**
- * Form 5695 — Residential Energy Credits (2025 revision)
- *
- * Part I: Residential Clean Energy Credit (Section 25D)
- *   30% credit on qualified solar, wind, geothermal, fuel cell, and battery
- *   storage property.
- *   PDF lines 1-4, 5a/5b, 6a/6b, 7a-7c, 8-16.
- *
- * Part II: Energy Efficient Home Improvement Credit (Section 25C)
- *   Section A — Qualified Energy Efficiency Improvements (lines 17-20)
- *   Section B — Residential Energy Property Expenditures (lines 21-32)
- *   30% credit on building envelope components, energy property, and home
- *   energy audits. Annual cap of $3,200 with sub-limits.
- *
- * Line 15 (Part I credit) feeds Schedule 3 line 5a.
- * Line 32 (Part II credit) feeds Schedule 3 line 5b.
- *
- * PDF field count: 167 fields across 4 pages.
+const ROOT = '/information/form5695'
+const itemKeys = [
+  'doors',
+  'windows',
+  'centralAirConditioners',
+  'waterHeaters',
+  'furnaces',
+  'heatPumps',
+  'heatPumpWaterHeaters',
+  'biomassStoves',
+  'enablingProperty'
+] as const
+type ItemKey = (typeof itemKeys)[number]
+
+/** TY2025 Form 5695. Qualified net costs are prepared worksheet inputs.
+ * Instructions: https://www.irs.gov/instructions/i5695 (pinned in authority/).
+ * Part II precedes child/other-dependent and Part I credit limitations.
+ * Explicit item details replace ambiguous legacy doors/windows aggregation.
  */
 export default class F5695 extends F1040Attachment {
-  tag: FormTag = 'f5695'
+  tag = 'f5695'
   sequenceIndex = 75
-
   readonly data: Form5695Data
+  readonly detail: Form5695Details | undefined
 
   constructor(f1040: F1040, data: Form5695Data) {
     super(f1040)
     this.data = data
+    this.detail = data.details
+    this.validate()
   }
 
-  isNeeded = (): boolean => this.f1040.info.form5695 !== undefined
+  private fail = (
+    code: TaxFormInputError['code'],
+    path: string,
+    message: string
+  ): never => {
+    throw new TaxFormInputError(code, `${ROOT}/${path}`, message)
+  }
+  private sum = (...values: number[]): number => {
+    try {
+      return sumToWholeDollars(values, 'Form 5695')
+    } catch (e) {
+      if (e instanceof MoneyInputError)
+        return this.fail('invalid_input', '', e.message)
+      throw e
+    }
+  }
+  private cents = (values: number[]): number => {
+    try {
+      return sumExactCents(values, 'Form 5695')
+    } catch (e) {
+      if (e instanceof MoneyInputError)
+        return this.fail('invalid_input', '', e.message)
+      throw e
+    }
+  }
+  private percent30 = (amount: number, cap = Number.MAX_SAFE_INTEGER): number =>
+    Math.min(cap, rateToWholeDollars(amount, 3, 10, 'Form 5695'))
+  private items = (key: ItemKey): EnergyPropertyItem[] =>
+    [...(this.detail?.[key] ?? [])].sort(
+      (a, b) => b.cost - a.cost || a.qmid.localeCompare(b.qmid)
+    )
+  private itemCost = (key: ItemKey, start = 0, end?: number): number =>
+    this.sum(
+      ...this.items(key)
+        .slice(start, end)
+        .map((i) => i.cost)
+    )
+  private itemLineCost = (key: ItemKey, index: number): number =>
+    this.sum(this.items(key)[index]?.cost ?? 0)
 
-  // ──────────────────────────────────────────────
-  // Part I — Residential Clean Energy Credit
-  // ──────────────────────────────────────────────
+  private validate = (): void => {
+    const d = this.data
+    const amountKeys = [
+      'solarElectric',
+      'solarWaterHeating',
+      'fuelCell',
+      'smallWindEnergy',
+      'geothermalHeatPump',
+      'batteryStorage',
+      'insulationMaterials',
+      'exteriorDoorsWindows',
+      'roofingSurfaces',
+      'heatPumps',
+      'heatPumpWaterHeaters',
+      'biomassStoves',
+      'centralAC',
+      'naturalGasFurnace',
+      'panelboards',
+      'homeEnergyAudit',
+      'priorYearCreditsUsed'
+    ] as const
+    amountKeys.forEach((k) => nonnegativeMoney(d[k], `${ROOT}/${k}`))
+    this.sum(...amountKeys.map((k) => d[k]))
+    if (d.roofingSurfaces > 0)
+      this.fail(
+        'unsupported',
+        'roofingSurfaces',
+        'Roofing surfaces are not a TY2025 Form 5695 credit category'
+      )
+    const x = this.detail
+    if (!x) {
+      if (amountKeys.some((k) => d[k] > 0))
+        this.fail(
+          'needs_facts',
+          'details',
+          'Provide qualification facts, property address, carryforward and itemized QMID/cost details'
+        )
+      return
+    }
+    if (
+      !establishedBoolean(
+        x.costsQualifiedFor2025,
+        `${ROOT}/details/costsQualifiedFor2025`
+      )
+    )
+      this.fail(
+        'needs_facts',
+        'details/costsQualifiedFor2025',
+        'Establish qualified net 2025 costs, including allocations and labor exclusions'
+      )
+    for (const key of ['jointOccupancy', 'condominiumShare'] as const) {
+      if (establishedBoolean(x[key], `${ROOT}/details/${key}`))
+        this.fail(
+          'unsupported',
+          `details/${key}`,
+          'Shared-property allocation requires a separate supported worksheet'
+        )
+    }
+    const home = x.home
+    if (
+      !home ||
+      !['street', 'city', 'state', 'zip'].every(
+        (k) =>
+          typeof home[k as keyof typeof home] === 'string' &&
+          String(home[k as keyof typeof home]).trim().length > 0
+      )
+    )
+      this.fail(
+        'needs_facts',
+        'details/home',
+        'Provide the property address; do not substitute the mailing address'
+      )
+    if (!/^[A-Z]{2}$/.test(home.state) || !/^\d{5}(?:-\d{4})?$/.test(home.zip))
+      this.fail('invalid_input', 'details/home', 'Invalid state or ZIP format')
+    nonnegativeMoney(
+      x.cleanEnergyCarryforward,
+      `${ROOT}/details/cleanEnergyCarryforward`
+    )
+    for (const key of itemKeys) {
+      if (!Array.isArray(x[key]))
+        this.fail(
+          'needs_facts',
+          `details/${key}`,
+          'Provide all item QMID/cost pairs or an explicit empty list'
+        )
+      x[key].forEach((i, n) => {
+        if (!i || typeof i !== 'object')
+          this.fail(
+            'invalid_input',
+            `details/${key}/${n}`,
+            'Expected a QMID/cost item'
+          )
+        nonnegativeMoney(i.cost, `${ROOT}/details/${key}/${n}/cost`)
+        if (!/^[A-Z0-9]{4}$/.test(i.qmid ?? ''))
+          this.fail(
+            i.qmid === undefined ? 'needs_facts' : 'invalid_input',
+            `details/${key}/${n}/qmid`,
+            'A four-character alphanumeric QMID is required for each item'
+          )
+      })
+      this.cents(x[key].map((i) => i.cost))
+    }
+    const reconcile = (key: keyof Form5695Data, keys: ItemKey[]) => {
+      if (
+        this.cents([d[key] as number]) !==
+        this.cents(keys.flatMap((k) => x[k].map((i) => i.cost)))
+      )
+        this.fail(
+          'invalid_input',
+          String(key),
+          'Legacy total and detailed item costs do not reconcile exactly'
+        )
+    }
+    reconcile('exteriorDoorsWindows', ['doors', 'windows'])
+    reconcile('centralAC', ['centralAirConditioners'])
+    reconcile('naturalGasFurnace', ['furnaces'])
+    reconcile('heatPumps', ['heatPumps'])
+    reconcile('heatPumpWaterHeaters', ['heatPumpWaterHeaters'])
+    reconcile('biomassStoves', ['biomassStoves'])
+    reconcile('panelboards', ['enablingProperty'])
+    if (
+      d.batteryStorage > 0 &&
+      !establishedBoolean(
+        x.batteryAtLeast3Kwh,
+        `${ROOT}/details/batteryAtLeast3Kwh`
+      )
+    )
+      this.fail(
+        'invalid_input',
+        'details/batteryAtLeast3Kwh',
+        'Included battery costs must have capacity of at least 3 kWh'
+      )
+    if (d.fuelCell > 0) {
+      if (
+        !establishedBoolean(
+          x.fuelCellMainHomeInUS,
+          `${ROOT}/details/fuelCellMainHomeInUS`
+        )
+      )
+        this.fail(
+          'invalid_input',
+          'details/fuelCellMainHomeInUS',
+          'Included fuel cell costs must be for a main home in the US'
+        )
+      if (x.fuelCellCapacityKw === undefined)
+        this.fail(
+          'needs_facts',
+          'details/fuelCellCapacityKw',
+          'Fuel cell capacity is needed for the per-half-kW limit'
+        )
+      const kw = x.fuelCellCapacityKw
+      if (
+        typeof kw !== 'number' ||
+        !Number.isSafeInteger(kw * 2) ||
+        kw < 0.5 ||
+        kw > 1000000
+      )
+        this.fail(
+          'invalid_input',
+          'details/fuelCellCapacityKw',
+          'Use qualified capacity in half-kW increments'
+        )
+    }
+    if (
+      d.insulationMaterials > 0 ||
+      d.exteriorDoorsWindows > 0 ||
+      x.envelope !== undefined
+    ) {
+      if (!x.envelope)
+        this.fail(
+          'needs_facts',
+          'details/envelope',
+          'Establish the Section A qualification facts'
+        )
+      for (const key of [
+        'mainHomeInUS',
+        'originalUser',
+        'expectedLifeAtLeast5Years',
+        'constructionCostsExcluded'
+      ] as const)
+        establishedBoolean(x.envelope?.[key], `${ROOT}/details/envelope/${key}`)
+      if (x.envelope?.constructionCostsExcluded === false)
+        this.fail(
+          'needs_facts',
+          'details/envelope/constructionCostsExcluded',
+          'Separate construction costs from eligible existing-home improvements'
+        )
+    }
+    if (
+      itemKeys.slice(2).some((k) => x[k].length > 0) ||
+      x.energyProperty !== undefined
+    ) {
+      if (!x.energyProperty)
+        this.fail(
+          'needs_facts',
+          'details/energyProperty',
+          'Establish the Section B qualification facts'
+        )
+      establishedBoolean(
+        x.energyProperty?.homeInUS,
+        `${ROOT}/details/energyProperty/homeInUS`
+      )
+      establishedBoolean(
+        x.energyProperty?.originallyPlacedInServiceByTaxpayer,
+        `${ROOT}/details/energyProperty/originallyPlacedInServiceByTaxpayer`
+      )
+    }
+    if (d.panelboards > 0) {
+      const codes =
+        x.enablingPropertyCodes ??
+        this.fail(
+          'needs_facts',
+          'details/enablingPropertyCodes',
+          'Identify the qualifying enabled property'
+        )
+      if (codes.length === 0)
+        this.fail(
+          'needs_facts',
+          'details/enablingPropertyCodes',
+          'Identify the qualifying enabled property'
+        )
+      const mapping: Record<string, ItemKey> = {
+        A: 'windows',
+        B: 'centralAirConditioners',
+        C: 'waterHeaters',
+        D: 'furnaces',
+        E: 'heatPumps',
+        F: 'heatPumpWaterHeaters',
+        G: 'biomassStoves'
+      }
+      if (
+        new Set(codes).size !== codes.length ||
+        codes.some((c) => !mapping[c] || x[mapping[c]].length === 0)
+      )
+        this.fail(
+          'unsupported',
+          'details/enablingPropertyCodes',
+          'Each code must identify included 2025 enabled property; prior-year safe-harbor allocations need a separate worksheet'
+        )
+    }
+    if (d.homeEnergyAudit > 0)
+      establishedBoolean(
+        x.qualifiedHomeEnergyAudit,
+        `${ROOT}/details/qualifiedHomeEnergyAudit`
+      )
+    this.sum(
+      ...amountKeys.map((k) => d[k]),
+      x.cleanEnergyCarryforward,
+      ...x.waterHeaters.map((i) => i.cost)
+    )
+  }
 
-  // PDF Line 1: Qualified solar electric property costs
-  pdfL1 = (): number => this.data.solarElectric
-
-  // PDF Line 2: Qualified solar water heating property costs
-  pdfL2 = (): number => this.data.solarWaterHeating
-
-  // PDF Line 3: Qualified small wind energy property costs
-  pdfL3 = (): number => this.data.smallWindEnergy
-
-  // PDF Line 4: Qualified geothermal heat pump property costs
-  pdfL4 = (): number => this.data.geothermalHeatPump
-
-  // PDF Line 5a: Battery storage yes/no (boolean)
-  pdfL5aYes = (): boolean => this.data.batteryStorage > 0
-
-  // PDF Line 5b: Qualified battery storage technology costs
-  pdfL5b = (): number | undefined =>
-    this.data.batteryStorage > 0 ? this.data.batteryStorage : undefined
-
-  // PDF Line 6a: Add lines 1 through 5b
+  isNeeded = (): boolean => this.data !== undefined
+  private envelopeAllowed = (): boolean =>
+    this.detail?.envelope?.mainHomeInUS === true &&
+    this.detail.envelope.originalUser &&
+    this.detail.envelope.expectedLifeAtLeast5Years &&
+    this.detail.envelope.constructionCostsExcluded
+  private propertyAllowed = (): boolean =>
+    this.detail?.energyProperty?.homeInUS === true &&
+    this.detail.energyProperty.originallyPlacedInServiceByTaxpayer
+  pdfL1 = (): number => this.sum(this.data.solarElectric)
+  pdfL2 = (): number => this.sum(this.data.solarWaterHeating)
+  pdfL3 = (): number => this.sum(this.data.smallWindEnergy)
+  pdfL4 = (): number => this.sum(this.data.geothermalHeatPump)
+  pdfL5b = (): number => this.sum(this.data.batteryStorage)
   pdfL6a = (): number =>
-    sumFields([
+    this.sum(
       this.pdfL1(),
       this.pdfL2(),
       this.pdfL3(),
       this.pdfL4(),
       this.pdfL5b()
-    ])
-
-  // PDF Line 6b: Multiply line 6a by 30% (0.30)
-  pdfL6b = (): number => Math.round(this.pdfL6a() * 0.3 * 100) / 100
-
-  // PDF Line 8: Qualified fuel cell property costs
-  pdfL8 = (): number | undefined =>
-    this.data.fuelCell > 0 ? this.data.fuelCell : undefined
-
-  // PDF Line 9: Multiply line 8 by 30%
-  pdfL9 = (): number | undefined => {
-    const fc = this.pdfL8()
-    return fc !== undefined ? Math.round(fc * 0.3 * 100) / 100 : undefined
-  }
-
-  // PDF Line 10: Kilowatt capacity * $1,000 (not computed — no kW in data)
-  pdfL10 = (): number | undefined => undefined
-
-  // PDF Line 11: Smaller of line 9 or line 10
-  pdfL11 = (): number | undefined => {
-    const l9 = this.pdfL9()
-    const l10 = this.pdfL10()
-    if (l9 === undefined) return undefined
-    if (l10 === undefined) return l9
-    return Math.min(l9, l10)
-  }
-
-  // PDF Line 12: Credit carryforward from prior year (not in data model)
-  pdfL12 = (): number | undefined => undefined
-
-  // PDF Line 13: Add lines 6b, 11, and 12
-  pdfL13 = (): number =>
-    sumFields([this.pdfL6b(), this.pdfL11(), this.pdfL12()])
-
-  // PDF Line 14: Tax liability limit (Residential Energy Credit Limit Worksheet)
-  // Form 1040 line 18 minus nonrefundable credits that come before this credit
+    )
+  pdfL6b = (): number => this.percent30(this.pdfL6a())
+  pdfL8 = (): number => this.sum(this.data.fuelCell)
+  pdfL9 = (): number => this.percent30(this.pdfL8())
+  pdfL10 = (): number => this.sum((this.detail?.fuelCellCapacityKw ?? 0) * 1000)
+  pdfL11 = (): number => Math.min(this.pdfL9(), this.pdfL10())
+  pdfL12 = (): number => this.sum(this.detail?.cleanEnergyCarryforward ?? 0)
+  pdfL13 = (): number => this.sum(this.pdfL6b(), this.pdfL11(), this.pdfL12())
   pdfL14 = (): number => {
-    const tax = this.f1040.l18()
-    const sch3 = this.f1040.schedule3
-    const priorCredits = sumFields([
-      sch3.l1(), // Foreign tax credit
-      sch3.l2(), // Child/dependent care
-      sch3.l3(), // Education credits
-      sch3.l4(), // Saver's credit
-    ])
-    return Math.max(0, tax - priorCredits)
+    if (this.pdfL13() === 0) return 0
+    const s = this.f1040.schedule3
+    const childOffset = this.f1040.schedule8812.usesCreditLimitWorksheetB()
+      ? this.f1040.schedule8812.creditLimitWorksheetBLine14()
+      : this.f1040.l19() ?? 0
+    return Math.max(
+      0,
+      this.pdfL31() -
+        this.sum(
+          this.pdfL32(),
+          s.l6m() ?? 0,
+          s.l6f() ?? 0,
+          childOffset,
+          s.l6g() ?? 0,
+          s.l6c() ?? 0,
+          s.l6h() ?? 0
+        )
+    )
   }
-
-  // PDF Line 15: Residential clean energy credit = smaller of 13 or 14
-  pdfL15 = (): number | undefined => {
-    const credit = Math.min(this.pdfL13(), this.pdfL14())
-    return credit > 0 ? credit : undefined
-  }
-
-  // PDF Line 16: Credit carryforward to next year (13 - 15)
-  pdfL16 = (): number | undefined => {
-    const carryforward = this.pdfL13() - (this.pdfL15() ?? 0)
-    return carryforward > 0 ? carryforward : undefined
-  }
-
-  // ──────────────────────────────────────────────
-  // Part II — Energy Efficient Home Improvement Credit
-  // ──────────────────────────────────────────────
-
-  // Section A — Qualified Energy Efficiency Improvements
-
-  // PDF Line 18a: Insulation material/system cost
-  pdfL18a = (): number | undefined =>
-    this.data.insulationMaterials > 0
-      ? this.data.insulationMaterials
-      : undefined
-
-  // PDF Line 18b: 18a * 30%, max $1,200
-  pdfL18b = (): number | undefined => {
-    const cost = this.pdfL18a()
-    if (cost === undefined) return undefined
-    return Math.min(1200, Math.round(cost * 0.3 * 100) / 100)
-  }
-
-  // PDF Line 19a: Most expensive door cost
-  // Simplified — we put the total doors/windows cost here
-  pdfL19a = (): number | undefined =>
-    this.data.exteriorDoorsWindows > 0
-      ? this.data.exteriorDoorsWindows
-      : undefined
-
-  // PDF Line 19c: 19a * 30%, max $250
-  pdfL19c = (): number | undefined => {
-    const cost = this.pdfL19a()
-    if (cost === undefined) return undefined
-    return Math.min(250, Math.round(cost * 0.3 * 100) / 100)
-  }
-
-  // PDF Line 19h: Total doors credit = 19c + 19g, max $500
-  // Simplified — only using 19c since we don't track individual doors
-  pdfL19h = (): number | undefined => {
-    const c = this.pdfL19c()
-    if (c === undefined) return undefined
-    return Math.min(500, c)
-  }
-
-  // PDF Line 20d: Windows/skylights credit = 20c * 30%, max $600
-  // Not separately tracked in data model (exteriorDoorsWindows combines both)
-  pdfL20d = (): number | undefined => undefined
-
-  // Section B — Residential Energy Property Expenditures
-
-  // PDF Line 22a cost: Central AC cost
-  pdfL22aCost = (): number | undefined =>
-    this.data.centralAC > 0 ? this.data.centralAC : undefined
-
-  // PDF Line 22c: Total central AC (22a + 22b)
-  pdfL22c = (): number | undefined => this.pdfL22aCost()
-
-  // PDF Line 22d: 22c * 30%, max $600
-  pdfL22d = (): number | undefined => {
-    const cost = this.pdfL22c()
-    if (cost === undefined) return undefined
-    return Math.min(600, Math.round(cost * 0.3 * 100) / 100)
-  }
-
-  // PDF Line 23d: Water heater credit = 23c * 30%, max $600
-  // Not separately tracked — naturalGasFurnace data covers furnace/boiler
-  pdfL23d = (): number | undefined => undefined
-
-  // PDF Line 24a cost: Furnace/boiler cost
-  pdfL24aCost = (): number | undefined =>
-    this.data.naturalGasFurnace > 0 ? this.data.naturalGasFurnace : undefined
-
-  // PDF Line 24c: Total furnace (24a + 24b)
-  pdfL24c = (): number | undefined => this.pdfL24aCost()
-
-  // PDF Line 24d: 24c * 30%, max $600
-  pdfL24d = (): number | undefined => {
-    const cost = this.pdfL24c()
-    if (cost === undefined) return undefined
-    return Math.min(600, Math.round(cost * 0.3 * 100) / 100)
-  }
-
-  // PDF Line 25c: Enabling property (panelboards) cost
-  pdfL25c = (): number | undefined =>
-    this.data.panelboards > 0 ? this.data.panelboards : undefined
-
-  // PDF Line 25e: 25c * 30%, max $600
-  pdfL25e = (): number | undefined => {
-    const cost = this.pdfL25c()
-    if (cost === undefined) return undefined
-    return Math.min(600, Math.round(cost * 0.3 * 100) / 100)
-  }
-
-  // PDF Line 26b: Home energy audit cost
-  pdfL26b = (): number | undefined =>
-    this.data.homeEnergyAudit > 0 ? this.data.homeEnergyAudit : undefined
-
-  // PDF Line 26c: 26b * 30%, max $150
-  pdfL26c = (): number | undefined => {
-    const cost = this.pdfL26b()
-    if (cost === undefined) return undefined
-    return Math.min(150, Math.round(cost * 0.3 * 100) / 100)
-  }
-
-  // PDF Line 27: Sum of 18b, 19h, 20d, 22d, 23d, 24d, 25e, 26c
+  pdfL15 = (): number => Math.min(this.pdfL13(), this.pdfL14())
+  pdfL16 = (): number => this.pdfL13() - this.pdfL15()
+  pdfL18a = (): number =>
+    this.envelopeAllowed() ? this.sum(this.data.insulationMaterials) : 0
+  pdfL18b = (): number => this.percent30(this.pdfL18a(), 1200)
+  pdfL19a = (): number =>
+    this.envelopeAllowed() ? this.itemLineCost('doors', 0) : 0
+  pdfL19c = (): number => this.percent30(this.pdfL19a(), 250)
+  pdfL19d = (): number =>
+    this.envelopeAllowed()
+      ? this.sum(this.itemLineCost('doors', 1), this.itemLineCost('doors', 2))
+      : 0
+  pdfL19e = (): number =>
+    this.envelopeAllowed() ? this.itemCost('doors', 3) : 0
+  pdfL19f = (): number => this.sum(this.pdfL19d(), this.pdfL19e())
+  pdfL19g = (): number => this.percent30(this.pdfL19f())
+  pdfL19h = (): number =>
+    Math.min(500, this.sum(this.pdfL19c(), this.pdfL19g()))
+  pdfL20a = (): number =>
+    this.envelopeAllowed()
+      ? this.sum(
+          ...this.items('windows')
+            .slice(0, 4)
+            .map((i) => this.sum(i.cost))
+        )
+      : 0
+  pdfL20b = (): number =>
+    this.envelopeAllowed() ? this.itemCost('windows', 4) : 0
+  pdfL20c = (): number => this.sum(this.pdfL20a(), this.pdfL20b())
+  pdfL20d = (): number => this.percent30(this.pdfL20c(), 600)
+  propertyCost = (key: ItemKey, start = 0, end?: number): number =>
+    this.propertyAllowed() ? this.itemCost(key, start, end) : 0
+  pdfL22aCost = (): number => this.propertyCost('centralAirConditioners', 0, 1)
+  pdfL22b = (): number => this.propertyCost('centralAirConditioners', 1)
+  pdfL22c = (): number => this.sum(this.pdfL22aCost(), this.pdfL22b())
+  pdfL22d = (): number => this.percent30(this.pdfL22c(), 600)
+  pdfL23a = (): number =>
+    this.propertyAllowed()
+      ? this.sum(
+          this.itemLineCost('waterHeaters', 0),
+          this.itemLineCost('waterHeaters', 1)
+        )
+      : 0
+  pdfL23b = (): number => this.propertyCost('waterHeaters', 2)
+  pdfL23c = (): number => this.sum(this.pdfL23a(), this.pdfL23b())
+  pdfL23d = (): number => this.percent30(this.pdfL23c(), 600)
+  pdfL24aCost = (): number => this.propertyCost('furnaces', 0, 1)
+  pdfL24b = (): number => this.propertyCost('furnaces', 1)
+  pdfL24c = (): number => this.sum(this.pdfL24aCost(), this.pdfL24b())
+  pdfL24d = (): number => this.percent30(this.pdfL24c(), 600)
+  pdfL25c = (): number => this.propertyCost('enablingProperty')
+  pdfL25e = (): number => this.percent30(this.pdfL25c(), 600)
+  pdfL26b = (): number =>
+    this.detail?.qualifiedHomeEnergyAudit === true
+      ? this.sum(this.data.homeEnergyAudit)
+      : 0
+  pdfL26c = (): number => this.percent30(this.pdfL26b(), 150)
   pdfL27 = (): number =>
-    sumFields([
+    this.sum(
       this.pdfL18b(),
       this.pdfL19h(),
       this.pdfL20d(),
@@ -240,463 +459,251 @@ export default class F5695 extends F1040Attachment {
       this.pdfL24d(),
       this.pdfL25e(),
       this.pdfL26c()
-    ])
-
-  // PDF Line 28: Smaller of line 27 or $1,200
+    )
   pdfL28 = (): number => Math.min(1200, this.pdfL27())
-
-  // PDF Line 29a cost: Heat pump cost
-  pdfL29aCost = (): number | undefined =>
-    this.data.heatPumps > 0 ? this.data.heatPumps : undefined
-
-  // PDF Line 29c cost: Heat pump water heater cost
-  pdfL29cCost = (): number | undefined =>
-    this.data.heatPumpWaterHeaters > 0
-      ? this.data.heatPumpWaterHeaters
-      : undefined
-
-  // PDF Line 29e cost: Biomass stove/boiler cost
-  pdfL29eCost = (): number | undefined =>
-    this.data.biomassStoves > 0 ? this.data.biomassStoves : undefined
-
-  // PDF Line 29g: Sum of 29a through 29f
+  pdfL29aCost = (): number => this.propertyCost('heatPumps', 0, 1)
+  pdfL29b = (): number => this.propertyCost('heatPumps', 1)
+  pdfL29cCost = (): number => this.propertyCost('heatPumpWaterHeaters', 0, 1)
+  pdfL29d = (): number => this.propertyCost('heatPumpWaterHeaters', 1)
+  pdfL29eCost = (): number => this.propertyCost('biomassStoves', 0, 1)
+  pdfL29f = (): number => this.propertyCost('biomassStoves', 1)
   pdfL29g = (): number =>
-    sumFields([this.pdfL29aCost(), this.pdfL29cCost(), this.pdfL29eCost()])
-
-  // PDF Line 29h: 29g * 30%, max $2,000
-  pdfL29h = (): number | undefined => {
-    const total = this.pdfL29g()
-    if (total <= 0) return undefined
-    return Math.min(2000, Math.round(total * 0.3 * 100) / 100)
-  }
-
-  // PDF Line 30: Add lines 28 and 29h
-  pdfL30 = (): number => sumFields([this.pdfL28(), this.pdfL29h()])
-
-  // PDF Line 31: Tax liability limitation
-  // Same as pdfL14 but also subtract the Part I credit (line 15)
+    this.sum(
+      this.pdfL29aCost(),
+      this.pdfL29b(),
+      this.pdfL29cCost(),
+      this.pdfL29d(),
+      this.pdfL29eCost(),
+      this.pdfL29f()
+    )
+  pdfL29h = (): number => this.percent30(this.pdfL29g(), 2000)
+  pdfL30 = (): number => this.sum(this.pdfL28(), this.pdfL29h())
   pdfL31 = (): number => {
-    const partILimit = this.pdfL14()
-    const partICredit = this.pdfL15() ?? 0
-    return Math.max(0, partILimit - partICredit)
+    const s = this.f1040.schedule3
+    return Math.max(
+      0,
+      this.sum(this.f1040.l18()) -
+        this.sum(
+          s.l6l() ?? 0,
+          s.l1() ?? 0,
+          s.l2() ?? 0,
+          s.l6d() ?? 0,
+          s.l3() ?? 0,
+          s.l4() ?? 0
+        )
+    )
+  }
+  pdfL32 = (): number => Math.min(this.pdfL30(), this.pdfL31())
+  // Preserve the two consumed legacy aliases; do not retain obsolete formulas.
+  l12 = (): number => this.pdfL15()
+  l24 = (): number => this.pdfL32()
+  l30 = (): number => this.sum(this.pdfL15(), this.pdfL32())
+  credit = (): number => this.l30()
+
+  supportingStatements = (): FormStatement[] => {
+    const detail = this.detail
+    if (!detail) return []
+    const groups: Array<[ItemKey, number, string]> = [
+      ['doors', 3, '19e'],
+      ['windows', 4, '20b'],
+      ['centralAirConditioners', 1, '22b'],
+      ['waterHeaters', 2, '23b'],
+      ['furnaces', 1, '24b'],
+      ['heatPumps', 1, '29b'],
+      ['heatPumpWaterHeaters', 1, '29d'],
+      ['biomassStoves', 1, '29f'],
+      ['enablingProperty', 2, '25d']
+    ]
+    return groups.flatMap(([key, count, line]) => {
+      const items = this.items(key).slice(count)
+      const allowed =
+        key === 'doors' || key === 'windows'
+          ? this.envelopeAllowed()
+          : this.propertyAllowed()
+      return !allowed || items.length === 0
+        ? []
+        : [
+            {
+              title: `Form 5695 line ${line} - additional qualified property`,
+              lines: [
+                `Name: ${this.f1040.namesString()}; SSN: ${
+                  this.f1040.info.taxPayer.primaryPerson.ssid
+                }`,
+                `Property: ${detail.home.street}, ${detail.home.city}, ${detail.home.state} ${detail.home.zip}`,
+                ...items.map(
+                  (i) => `QMID ${i.qmid}; qualified cost $${i.cost.toFixed(2)}`
+                ),
+                `Rounded line cost: $${this.sum(...items.map((i) => i.cost))}`
+              ]
+            }
+          ]
+    })
   }
 
-  // PDF Line 32: Energy efficient home improvement credit
-  // = smaller of line 30 or line 31
-  pdfL32 = (): number | undefined => {
-    const credit = Math.min(this.pdfL30(), this.pdfL31())
-    return credit > 0 ? credit : undefined
+  namedFields = (): Record<string, Field> => {
+    const x = this.detail
+    const f: Record<string, Field> = {
+      f1_01: this.f1040.namesString(),
+      f1_02: this.f1040.info.taxPayer.primaryPerson.ssid
+    }
+    const put = (page: number, n: number, value: Field) => {
+      f[`f${page}_${String(n).padStart(2, '0')}`] = value
+    }
+    const yesNo = (page: number, n: number, v: boolean | undefined) => {
+      if (v !== undefined) {
+        f[`c${page}_${n}[0]`] = v
+        f[`c${page}_${n}[1]`] = !v
+      }
+    }
+    const address = (page: number, start: number) => {
+      if (x)
+        [
+          x.home.street,
+          x.home.unit,
+          x.home.city,
+          x.home.state,
+          x.home.zip
+        ].forEach((v, i) => put(page, start + i, v))
+    }
+    if (this.pdfL6a() > 0) address(1, 3)
+    ;[this.pdfL1(), this.pdfL2(), this.pdfL3(), this.pdfL4()].forEach((v, i) =>
+      put(1, 8 + i, v)
+    )
+    yesNo(1, 1, x?.batteryAtLeast3Kwh)
+    put(1, 12, this.pdfL5b())
+    put(1, 13, this.pdfL6a())
+    put(1, 14, this.pdfL6b())
+    yesNo(1, 2, x?.fuelCellMainHomeInUS)
+    if (this.pdfL8() > 0) address(1, 15)
+    f.c1_3 = false
+    put(1, 20, this.pdfL8())
+    put(1, 21, this.pdfL9())
+    if (x?.fuelCellCapacityKw !== undefined) {
+      put(1, 22, Math.floor(x.fuelCellCapacityKw))
+      put(1, 23, x.fuelCellCapacityKw % 1 === 0 ? '0' : '5')
+    }
+    ;[
+      this.pdfL10(),
+      this.pdfL11(),
+      this.pdfL12(),
+      this.pdfL13(),
+      this.pdfL14(),
+      this.pdfL15(),
+      this.pdfL16()
+    ].forEach((v, i) => put(1, 24 + i, v))
+    yesNo(2, 1, x?.envelope?.mainHomeInUS)
+    yesNo(2, 2, x?.envelope?.originalUser)
+    yesNo(2, 3, x?.envelope?.expectedLifeAtLeast5Years)
+    if (x?.envelope) {
+      address(2, 3)
+      yesNo(2, 4, !x.envelope.constructionCostsExcluded)
+    }
+    if (this.envelopeAllowed()) {
+      put(2, 8, this.pdfL18a())
+      put(2, 9, this.pdfL18b())
+      put(2, 10, this.pdfL19a())
+      put(2, 11, this.items('doors')[0]?.qmid)
+      put(2, 13, this.pdfL19c())
+      put(2, 14, this.pdfL19d())
+      ;[
+        [15, 17],
+        [18, 20]
+      ].forEach(([q, c], i) => {
+        put(2, q, this.items('doors')[i + 1]?.qmid)
+        put(
+          2,
+          c,
+          this.items('doors')[i + 1]
+            ? this.itemLineCost('doors', i + 1)
+            : undefined
+        )
+      })
+      ;[
+        this.pdfL19e(),
+        this.pdfL19f(),
+        this.pdfL19g(),
+        this.pdfL19h(),
+        this.pdfL20a()
+      ].forEach((v, i) => put(2, 21 + i, v))
+      for (let i = 0; i < 4; i++) {
+        put(2, 26 + i * 3, this.items('windows')[i]?.qmid)
+        put(
+          2,
+          28 + i * 3,
+          this.items('windows')[i] ? this.itemLineCost('windows', i) : undefined
+        )
+      }
+      put(2, 38, this.pdfL20b())
+      put(2, 39, this.pdfL20c())
+      put(2, 40, this.pdfL20d())
+    }
+    yesNo(3, 1, x?.energyProperty?.homeInUS)
+    yesNo(3, 2, x?.energyProperty?.originallyPlacedInServiceByTaxpayer)
+    if (x?.energyProperty) address(3, 1)
+    if (this.propertyAllowed()) {
+      put(3, 21, this.pdfL22aCost())
+      put(3, 22, this.items('centralAirConditioners')[0]?.qmid)
+      put(3, 24, this.pdfL22b())
+      put(3, 25, this.pdfL22c())
+      put(3, 26, this.pdfL22d())
+      put(3, 27, this.pdfL23a())
+      put(3, 28, this.items('waterHeaters')[0]?.qmid)
+      // The official PDF reuses f3_30 for two different controls. Full paths are essential.
+      f['topmostSubform[0].Page3[0].f3_30[0]'] = this.items('waterHeaters')[0]
+        ? this.itemLineCost('waterHeaters', 0)
+        : undefined
+      f['topmostSubform[0].Page3[0].Ln23aii[0].Box1-4[0].f3_30[0]'] =
+        this.items('waterHeaters')[1]?.qmid
+      put(
+        3,
+        32,
+        this.items('waterHeaters')[1]
+          ? this.itemLineCost('waterHeaters', 1)
+          : undefined
+      )
+      ;[
+        this.pdfL23b(),
+        this.pdfL23c(),
+        this.pdfL23d(),
+        this.pdfL24aCost()
+      ].forEach((v, i) => put(3, 33 + i, v))
+      put(3, 37, this.items('furnaces')[0]?.qmid)
+      put(3, 39, this.pdfL24b())
+      put(3, 40, this.pdfL24c())
+      put(3, 41, this.pdfL24d())
+      yesNo(3, 4, this.pdfL25c() > 0)
+      ;(x?.enablingPropertyCodes ?? []).forEach((c, i) => put(3, 42 + i, c))
+      put(3, 49, this.pdfL25c())
+      put(3, 50, this.items('enablingProperty')[0]?.qmid)
+      put(3, 51, this.items('enablingProperty')[1]?.qmid)
+      put(3, 52, this.pdfL25e())
+      ;[this.pdfL29aCost(), this.pdfL29cCost(), this.pdfL29eCost()].forEach(
+        (v, i) => put(4, 5 + i * 4, v)
+      )
+      ;(
+        ['heatPumps', 'heatPumpWaterHeaters', 'biomassStoves'] as const
+      ).forEach((k, i) => put(4, 6 + i * 4, this.items(k)[0]?.qmid))
+      ;[this.pdfL29b(), this.pdfL29d(), this.pdfL29f()].forEach((v, i) =>
+        put(4, 8 + i * 4, v)
+      )
+      put(4, 17, this.pdfL29g())
+      put(4, 18, this.pdfL29h())
+    }
+    yesNo(
+      4,
+      1,
+      x?.qualifiedHomeEnergyAudit ??
+        (this.data.homeEnergyAudit === 0 ? false : undefined)
+    )
+    ;[this.pdfL26b(), this.pdfL26c(), this.pdfL27(), this.pdfL28()].forEach(
+      (v, i) => put(4, 1 + i, v)
+    )
+    put(4, 19, this.pdfL30())
+    put(4, 20, this.pdfL31())
+    put(4, 21, this.pdfL32())
+    f.c4_2 = false
+    f.c4_3 = false
+    return f
   }
-
-  // ──────────────────────────────────────────────
-  // Legacy methods for backward compatibility
-  // (used by Schedule 3, Schedule 8812, etc.)
-  // ──────────────────────────────────────────────
-
-  // Legacy l1-l6 kept for any internal references
-  l1 = (): number => this.data.solarElectric
-  l2 = (): number => this.data.solarWaterHeating
-  l3 = (): number => this.data.fuelCell
-  l4 = (): number => this.data.smallWindEnergy
-  l5 = (): number => this.data.geothermalHeatPump
-  l6 = (): number => this.data.batteryStorage
-  l7 = (): number =>
-    sumFields([this.l1(), this.l2(), this.l3(), this.l4(), this.l5(), this.l6()])
-  l8 = (): number => Math.round(this.l7() * 0.3 * 100) / 100
-  l12 = (): number => this.pdfL15() ?? 0
-
-  // Part II legacy
-  l13a = (): number => this.data.insulationMaterials
-  l13b = (): number => this.data.exteriorDoorsWindows
-  l13c = (): number => this.data.roofingSurfaces
-  l13d = (): number =>
-    Math.min(1200, sumFields([this.l13a(), this.l13b(), this.l13c()]))
-  l14a = (): number => this.data.heatPumps
-  l14b = (): number => this.data.heatPumpWaterHeaters
-  l14c = (): number => this.data.biomassStoves
-  l14d = (): number => this.data.centralAC
-  l14e = (): number => this.data.naturalGasFurnace
-  l14f = (): number => this.data.panelboards
-  l14g = (): number =>
-    sumFields([
-      this.l14a(),
-      this.l14b(),
-      this.l14c(),
-      this.l14d(),
-      this.l14e(),
-      this.l14f()
-    ])
-  l15 = (): number => Math.min(150, this.data.homeEnergyAudit)
-  l24 = (): number => this.pdfL32() ?? 0
-
-  // Line 30: Total residential energy credits = Part I + Part II
-  l30 = (): number | undefined => {
-    const total = this.l12() + this.l24()
-    return total > 0 ? total : undefined
-  }
-
-  // Convenience method for Schedule 3
-  credit = (): number | undefined => this.l30()
-
-  // ──────────────────────────────────────────────
-  // PDF fields — 167 entries matching the 2025 Form 5695 PDF
-  //
-  // Each index corresponds to a PDF form field in order.
-  // Fields we do not compute are set to undefined (skipped
-  // by the PDF filler). Checkboxes use boolean values.
-  // ──────────────────────────────────────────────
-
-  fields = (): Field[] => [
-    // ============================================================
-    // PAGE 1 — Part I: Residential Clean Energy Credit
-    // 167 fields total. Checkboxes at: 11,12,16,17,23,37-42,48,49,
-    // 83-86,129,130,142,143,165,166
-    // ============================================================
-
-    // 0: f1_01 — Name(s) shown on return
-    this.f1040.namesString(),
-    // 1: f1_02 — SSN
-    this.f1040.info.taxPayer.primaryPerson.ssid,
-
-    // Property address
-    // 2: f1_03 — Number and street
-    undefined,
-    // 3: f1_04 — Unit no.
-    undefined,
-    // 4: f1_05 — City or town
-    undefined,
-    // 5: f1_06 — State
-    undefined,
-    // 6: f1_07 — ZIP code
-    undefined,
-
-    // 7: f1_08 — Line 1: Solar electric costs
-    this.pdfL1(),
-    // 8: f1_09 — Line 2: Solar water heating costs
-    this.pdfL2(),
-    // 9: f1_10 — Line 3: Small wind energy costs
-    this.pdfL3(),
-    // 10: f1_11 — Line 4: Geothermal heat pump costs
-    this.pdfL4(),
-
-    // 11: c1_1[0] — Line 5a: Battery storage? Yes
-    this.pdfL5aYes(),
-    // 12: c1_1[1] — Line 5a: Battery storage? No
-    !this.pdfL5aYes(),
-
-    // 13: f1_12 — Line 5b: Battery storage costs
-    this.pdfL5b(),
-    // 14: f1_13 — Line 6a: Add lines 1-5b
-    this.pdfL6a(),
-    // 15: f1_14 — Line 6b: Multiply line 6a by 30%
-    this.pdfL6b(),
-
-    // 16: c1_2[0] — Line 7a: Fuel cell on main home? Yes
-    this.data.fuelCell > 0,
-    // 17: c1_2[1] — Line 7a: No
-    !(this.data.fuelCell > 0),
-
-    // Fuel cell main home address (line 7b)
-    // 18: f1_15 — Number and street
-    undefined,
-    // 19: f1_16 — Unit no.
-    undefined,
-    // 20: f1_17 — City or town
-    undefined,
-    // 21: f1_18 — State
-    undefined,
-    // 22: f1_19 — ZIP code
-    undefined,
-
-    // 23: c1_3[0] — Line 7c: Joint occupants checkbox
-    false,
-
-    // 24: f1_20 — Line 8: Fuel cell property costs
-    this.pdfL8(),
-    // 25: f1_21 — Line 9: Line 8 * 30%
-    this.pdfL9(),
-    // 26: f1_22 — Line 10: kW capacity * $1,000
-    this.pdfL10(),
-    // 27: f1_23 — Line 11: Smaller of line 9 or 10
-    this.pdfL11(),
-    // 28: f1_24 — Line 12: Credit carryforward
-    this.pdfL12(),
-    // 29: f1_25 — Line 13: Add lines 6b, 11, 12
-    this.pdfL13(),
-    // 30: f1_26 — Line 14: Tax liability limitation
-    this.pdfL14(),
-    // 31: f1_27 — Line 15: Clean energy credit
-    this.pdfL15(),
-    // 32: f1_28 — Line 16: Credit carryforward to next year
-    this.pdfL16(),
-
-    // Part I additional fields
-    // 33: f1_29 — Additional Part I field
-    undefined,
-    // 34: f1_30 — Additional Part I field
-    undefined,
-
-    // ============================================================
-    // PAGE 2 — Part II, Section A
-    // ============================================================
-
-    // 35: f2_01 — Name(s) (page 2 header)
-    this.f1040.namesString(),
-    // 36: f2_02 — SSN (page 2 header)
-    this.f1040.info.taxPayer.primaryPerson.ssid,
-
-    // 37: c2_1[0] — Line 17a: Improvements on main home? Yes
-    undefined,
-    // 38: c2_1[1] — Line 17a: No
-    undefined,
-    // 39: c2_2[0] — Line 17b: Original user? Yes
-    undefined,
-    // 40: c2_2[1] — Line 17b: No
-    undefined,
-    // 41: c2_3[0] — Line 17c: Expected to remain 5+ years? Yes
-    undefined,
-    // 42: c2_3[1] — Line 17c: No
-    undefined,
-
-    // Line 17d — Main home address
-    // 43: f2_03 — Number and street
-    undefined,
-    // 44: f2_04 — Unit no.
-    undefined,
-    // 45: f2_05 — City or town
-    undefined,
-    // 46: f2_06 — State
-    undefined,
-    // 47: f2_07 — ZIP code
-    undefined,
-
-    // 48: c2_4[0] — Line 17e: Related to construction? Yes
-    undefined,
-    // 49: c2_4[1] — Line 17e: No
-    undefined,
-
-    // Line 18 — Insulation
-    // 50: f2_08 — Line 18a: Insulation cost
-    this.pdfL18a(),
-    // 51: f2_09 — Line 18b: 18a * 30%, max $1,200
-    this.pdfL18b(),
-
-    // Line 19 — Exterior doors
-    // 52: f2_10 — Line 19a QMID
-    undefined,
-    // 53: f2_11 — Line 19a: Most expensive door cost
-    this.pdfL19a(),
-    // 54: f2_12 — Line 19b QMID
-    undefined,
-    // 55: f2_13 — Line 19c: 19a * 30%, max $250
-    this.pdfL19c(),
-
-    // 56: f2_14 — Line 19d: Other door costs
-    undefined,
-    // 57: f2_15 — Line 19d(i) QMID
-    undefined,
-    // 58: f2_16 — Line 19d(i) cost
-    undefined,
-    // 59: f2_17 — Line 19d(ii) cost
-    undefined,
-    // 60: f2_18 — Line 19e: Cost of other qualifying doors
-    undefined,
-    // 61: f2_19 — Line 19f: Add 19d and 19e
-    undefined,
-    // 62: f2_20 — Line 19g: 19f * 30%
-    undefined,
-    // 63: f2_21 — Line 19h: 19c + 19g, max $500
-    this.pdfL19h(),
-
-    // Line 20 — Windows/skylights
-    // 64: f2_22 — Line 20a cost/QMID
-    undefined,
-    // 65: f2_23 — Line 20a(i) QMID
-    undefined,
-    // 66: f2_24 — Line 20a(i) cost
-    undefined,
-    // 67: f2_25 — Line 20a(ii) QMID
-    undefined,
-    // 68: f2_26 — Line 20a(ii) cost
-    undefined,
-    // 69: f2_27 — Line 20a(iii) QMID
-    undefined,
-    // 70: f2_28 — Line 20a(iii) cost
-    undefined,
-    // 71: f2_29 — Line 20a(iv) QMID
-    undefined,
-    // 72: f2_30 — Line 20a(iv) cost
-    undefined,
-    // 73: f2_31 — Line 20b: Other windows/skylights
-    undefined,
-    // 74: f2_32 — Line 20c: Add 20a and 20b
-    undefined,
-    // 75: f2_33 — Line 20c(ii)
-    undefined,
-    // 76: f2_34 — Line 20d: 20c * 30%, max $600
-    this.pdfL20d(),
-    // 77: f2_35 — Additional field
-    undefined,
-    // 78: f2_36 — Additional field
-    undefined,
-    // 79: f2_37 — Additional field
-    undefined,
-    // 80: f2_38 — Additional field
-    undefined,
-    // 81: f2_39 — Additional field
-    undefined,
-    // 82: f2_40 — Additional field
-    undefined,
-
-    // ============================================================
-    // PAGE 3 — Part II, Section B
-    // ============================================================
-
-    // 83: c3_1[0] — Line 21a: Qualified energy property? Yes
-    undefined,
-    // 84: c3_1[1] — Line 21a: No
-    undefined,
-    // 85: c3_2[0] — Line 21b: Originally placed in service? Yes
-    undefined,
-    // 86: c3_2[1] — Line 21b: No
-    undefined,
-
-    // Line 21c — Address rows (4 rows x 5 fields)
-    // Row 1
-    undefined, undefined, undefined, undefined, undefined,  // 87-91
-    // Row 2
-    undefined, undefined, undefined, undefined, undefined,  // 92-96
-    // Row 3
-    undefined, undefined, undefined, undefined, undefined,  // 97-101
-    // Row 4
-    undefined, undefined, undefined, undefined, undefined,  // 102-106
-
-    // Line 22 — Central AC
-    // 107: f3_21 — Line 22a QMID
-    undefined,
-    // 108: f3_22 — Line 22a cost
-    this.pdfL22aCost(),
-    // 109: f3_23 — Line 22a QMID (second field)
-    undefined,
-    // 110: f3_24 — Line 22b: Other AC cost
-    undefined,
-    // 111: f3_25 — Line 22c: 22a + 22b
-    this.pdfL22c(),
-    // 112: f3_26 — Line 22d: 22c * 30%, max $600
-    this.pdfL22d(),
-
-    // Line 23 — Water heaters
-    // 113: f3_27 — Line 23a QMID
-    undefined,
-    // 114: f3_28 — Line 23a(i) QMID
-    undefined,
-    // 115: f3_29 — Line 23a(i) cost
-    undefined,
-    // 116: f3_30 — Line 23a(ii) QMID
-    undefined,
-    // 117: f3_30 — Line 23a(ii) cost
-    undefined,
-    // 118: f3_31 — Line 23a(ii) QMID (continued)
-    undefined,
-    // 119: f3_32 — Line 23b: Other water heaters
-    undefined,
-    // 120: f3_33 — Line 23c: 23a + 23b
-    undefined,
-    // 121: f3_34 — Line 23d: 23c * 30%, max $600
-    this.pdfL23d(),
-
-    // Line 24 — Furnace/hot water boiler
-    // 122: f3_35 — Line 24a QMID
-    undefined,
-    // 123: f3_36 — Line 24a cost
-    this.pdfL24aCost(),
-    // 124: f3_37 — Line 24a QMID (second)
-    undefined,
-    // 125: f3_38 — Line 24b: Other furnace cost
-    undefined,
-    // 126: f3_39 — Line 24c: 24a + 24b
-    this.pdfL24c(),
-    // 127: f3_40 — Line 24d: 24c * 30%, max $600
-    this.pdfL24d(),
-    // 128: f3_41 — Line 24d (additional)
-    undefined,
-
-    // Line 25 — Enabling property (panelboards)
-    // 129: c3_4[0] — Line 25a: Yes
-    undefined,
-    // 130: c3_4[1] — Line 25a: No
-    undefined,
-
-    // 131-137: f3_42-f3_48 — Line 25b: Code(s) fields (maxLen=3 each)
-    undefined, undefined, undefined, undefined, undefined, undefined, undefined,
-    // 138: f3_49 — Line 25c: Cost of enabling property
-    this.pdfL25c(),
-    // 139: f3_50 — Line 25d(i) QMID (maxLen=4)
-    undefined,
-    // 140: f3_51 — Line 25d(ii) QMID (maxLen=4)
-    undefined,
-    // 141: f3_52 — Line 25e: 25c * 30%, max $600
-    this.pdfL25e(),
-
-    // ============================================================
-    // PAGE 4 — Part II, Section B (continued)
-    // ============================================================
-
-    // 142: c4_1[0] — Line 26a: Home energy audit? Yes
-    undefined,
-    // 143: c4_1[1] — Line 26a: No
-    undefined,
-
-    // 144: f4_01 — Line 26b: Cost of home energy audits
-    this.pdfL26b(),
-    // 145: f4_02 — Line 26c: 26b * 30%, max $150
-    this.pdfL26c(),
-
-    // 146: f4_03 — Line 27: Sum of credits
-    this.pdfL27(),
-    // 147: f4_04 — Line 28: Smaller of line 27 or $1,200
-    this.pdfL28(),
-
-    // Line 29 — Heat pumps, water heaters, biomass
-    // 148: f4_05 — Line 29a: Heat pump cost
-    this.pdfL29aCost(),
-    // 149: f4_06 — Line 29a QMID
-    undefined,
-    // 150: f4_07 — Line 29a QMID (continued)
-    undefined,
-    // 151: f4_08 — Line 29b: Other heat pump cost
-    undefined,
-    // 152: f4_09 — Line 29c: Heat pump water heater cost
-    this.pdfL29cCost(),
-    // 153: f4_10 — Line 29c QMID
-    undefined,
-    // 154: f4_11 — Line 29c QMID (continued)
-    undefined,
-    // 155: f4_12 — Line 29d: Other heat pump water heater cost
-    undefined,
-    // 156: f4_13 — Line 29e: Biomass stove/boiler cost
-    this.pdfL29eCost(),
-    // 157: f4_14 — Line 29e QMID
-    undefined,
-    // 158: f4_15 — Line 29e QMID (continued)
-    undefined,
-    // 159: f4_16 — Line 29f: Other biomass cost
-    undefined,
-    // 160: f4_17 — Line 29g: Add lines 29a-29f
-    this.pdfL29g(),
-    // 161: f4_18 — Line 29h: 29g * 30%, max $2,000
-    this.pdfL29h(),
-
-    // 162: f4_19 — Line 30: Add lines 28 and 29h
-    this.pdfL30(),
-    // 163: f4_20 — Line 31: Tax liability limitation
-    this.pdfL31(),
-    // 164: f4_21 — Line 32: Energy efficient home improvement credit
-    this.pdfL32(),
-
-    // 165: c4_2 — Line 32a: Joint occupants checkbox
-    undefined,
-    // 166: c4_3 — Line 32b: Condo/cooperative checkbox
-    undefined
-  ]
+  fields = (): Field[] => Object.values(this.namedFields())
 }

@@ -19,67 +19,79 @@ export function fillPDFByName(
   namedValues: Record<string, Field>,
   formName: string
 ): PDFDocument {
-  const form = pdf.getForm()
-
+  const allFields = pdf.getForm().getFields()
+  // Decoding hierarchical PDF names is expensive. Index once per document,
+  // preserving all candidates so duplicate leaf names still fail explicitly.
+  const exactIndex = new Map<string, typeof allFields>()
+  const suffixIndex = new Map<string, typeof allFields>()
+  const add = (
+    index: Map<string, typeof allFields>,
+    key: string,
+    field: (typeof allFields)[number]
+  ) => {
+    const existing = index.get(key)
+    if (existing) existing.push(field)
+    else index.set(key, [field])
+  }
+  for (const field of allFields) {
+    const name = field.getName()
+    add(exactIndex, name, field)
+    const aliases = new Set<string>()
+    for (
+      let dot = name.indexOf('.');
+      dot !== -1;
+      dot = name.indexOf('.', dot + 1)
+    ) {
+      const suffix = name.slice(dot + 1)
+      aliases.add(suffix)
+      if (suffix.endsWith('[0]')) aliases.add(suffix.slice(0, -3))
+    }
+    for (const alias of aliases) add(suffixIndex, alias, field)
+  }
   for (const [fieldName, value] of Object.entries(namedValues)) {
     if (value === undefined || value === null) continue
-
-    try {
-      // Try to find the field by name — pdf-lib uses the full path
-      // IRS fields are like: form1[0].Page1[0].f1_14[0]
-      // We search for a field ending with the given name
-      const allFields = form.getFields()
-      const pdfField = allFields.find(f => {
-        const name = f.getName()
-        return name === fieldName ||
-          name.endsWith(`.${fieldName}[0]`) ||
-          name.endsWith(`.${fieldName}`) ||
-          name.includes(`${fieldName}[0]`)
-      })
-
-      if (!pdfField) {
-        // Field not found — skip silently (may not exist in this year's form)
-        continue
-      }
-
-      if (_.isObject(value) && 'select' in value) {
-        // Radio group
-        const children = pdfField.acroField.getWidgets()
-        if (value.select < children.length) {
-          const setValue = children[value.select].getOnValue()
-          if (setValue !== undefined) {
-            pdfField.acroField.dict.set(PDFName.of('V'), setValue)
-            children[value.select].setAppearanceState(setValue)
-          }
-        }
-      } else if (pdfField instanceof PDFCheckBox) {
-        if (value === true) {
-          pdfField.check()
-        }
-        // false/undefined = don't check (default)
-      } else if (pdfField instanceof PDFTextField) {
-        pdfField.setMaxLength(undefined)
-        if (typeof value === 'boolean') {
-          // Boolean going to text field — skip (type mismatch)
-          continue
-        }
-        const showValue =
-          !isNaN(value as number) &&
-          value &&
-          Array.from(value as string)[0] !== '0'
-            ? displayRound(value as number)?.toString()
-            : value?.toString()
-        pdfField.setText(showValue)
-      }
-
-      pdfField.enableReadOnly()
-    } catch (err) {
-      console.warn(
-        `${formName} field "${fieldName}": ${err instanceof Error ? err.message : err}`
+    const matches =
+      exactIndex.get(fieldName) ?? suffixIndex.get(fieldName) ?? []
+    if (matches.length !== 1)
+      throw new Error(
+        `${formName}: field ${fieldName} resolves to ${matches.length} controls`
       )
-    }
+    const field = matches[0]
+    if (_.isObject(value) && 'select' in value) {
+      const widgets = field.acroField.getWidgets()
+      if (
+        !Number.isInteger(value.select) ||
+        value.select < 0 ||
+        value.select >= widgets.length
+      )
+        throw new Error(`${formName}: invalid radio selection for ${fieldName}`)
+      const selected = widgets[value.select].getOnValue()
+      if (selected === undefined)
+        throw new Error(`${formName}: radio ${fieldName} has no on value`)
+      field.acroField.dict.set(PDFName.of('V'), selected)
+      widgets.forEach((w, i) =>
+        w.setAppearanceState(i === value.select ? selected : PDFName.of('Off'))
+      )
+    } else if (field instanceof PDFCheckBox) {
+      if (typeof value !== 'boolean')
+        throw new Error(`${formName}: checkbox ${fieldName} requires a boolean`)
+      if (value) field.check()
+      else field.uncheck()
+    } else if (field instanceof PDFTextField) {
+      if (typeof value !== 'string' && typeof value !== 'number')
+        throw new Error(
+          `${formName}: text ${fieldName} requires text or a number`
+        )
+      if (typeof value === 'number' && !Number.isFinite(value))
+        throw new Error(`${formName}: non-finite value for ${fieldName}`)
+      // The calculator owns money rounding. Strings include EINs, QMIDs, rates
+      // and dates and must never be coerced into numbers by the PDF renderer.
+      field.setMaxLength(undefined)
+      field.setText(String(value))
+    } else
+      throw new Error(`${formName}: unsupported field type for ${fieldName}`)
+    field.enableReadOnly()
   }
-
   return pdf
 }
 
@@ -143,7 +155,9 @@ export function fillPDF(
         pdfField.setText(showValue)
       } catch (err) {
         console.warn(
-          `${formName} Field ${index} (${pdfField.getName()}): skipped – ${err instanceof Error ? err.message : err}`
+          `${formName} Field ${index} (${pdfField.getName()}): skipped – ${
+            err instanceof Error ? err.message : String(err)
+          }`
         )
       }
     } else if (value !== undefined) {

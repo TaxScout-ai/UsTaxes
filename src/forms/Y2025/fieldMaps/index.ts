@@ -27,8 +27,13 @@ export const F1040_FIELDS: Record<string, string> = {
   foreign_province: 'f1_26',
   foreign_postal_code: 'f1_27',
 
-  // Filing Status (radio — c1_5 with select index)
-  filing_status: 'c1_5',
+  // Filing status: five independent c1_8 checkboxes in the TY2025 template
+  filing_status_single:
+    'topmostSubform[0].Page1[0].Checkbox_ReadOrder[0].c1_8[0]',
+  filing_status_mfj: 'topmostSubform[0].Page1[0].Checkbox_ReadOrder[0].c1_8[1]',
+  filing_status_mfs: 'topmostSubform[0].Page1[0].Checkbox_ReadOrder[0].c1_8[2]',
+  filing_status_hoh: 'topmostSubform[0].Page1[0].c1_8[0]',
+  filing_status_qss: 'topmostSubform[0].Page1[0].c1_8[1]',
   mfs_spouse_name: 'f1_28',
   hoh_child_name: 'f1_29',
   nonresident_spouse_name: 'f1_30',
@@ -40,10 +45,22 @@ export const F1040_FIELDS: Record<string, string> = {
   // Dependent checkboxes are handled by the form's _depField methods
 
   // Dependents (4 rows × 4 columns)
-  dep1_name: 'f1_31', dep1_ssn: 'f1_39', dep1_rel: 'f1_43',
-  dep2_name: 'f1_32', dep2_ssn: 'f1_40', dep2_rel: 'f1_44',
-  dep3_name: 'f1_33', dep3_ssn: 'f1_41', dep3_rel: 'f1_45',
-  dep4_name: 'f1_34', dep4_ssn: 'f1_42', dep4_rel: 'f1_46',
+  dep1_first_name: 'f1_31',
+  dep1_last_name: 'f1_35',
+  dep1_ssn: 'f1_39',
+  dep1_rel: 'f1_43',
+  dep2_first_name: 'f1_32',
+  dep2_last_name: 'f1_36',
+  dep2_ssn: 'f1_40',
+  dep2_rel: 'f1_44',
+  dep3_first_name: 'f1_33',
+  dep3_last_name: 'f1_37',
+  dep3_ssn: 'f1_41',
+  dep3_rel: 'f1_45',
+  dep4_first_name: 'f1_34',
+  dep4_last_name: 'f1_38',
+  dep4_ssn: 'f1_42',
+  dep4_rel: 'f1_46',
 
   // Income
   line_1a: 'f1_47',
@@ -73,17 +90,21 @@ export const F1040_FIELDS: Record<string, string> = {
   line_8: 'f1_72',
   line_9: 'f1_73',
   line_10: 'f1_74',
-  line_11: 'f1_75',  // AGI
+  line_11: 'f1_75', // AGI
 
   // Page 2
+  born_before_1961_01_02: 'c2_5',
+  blind: 'c2_6',
+  spouse_born_before_1961_01_02: 'c2_7',
+  spouse_blind: 'c2_8',
   line_11b: 'f2_01',
-  line_12: 'f2_02',   // Deductions
-  line_13a: 'f2_03',  // QBI
+  line_12: 'f2_02', // Deductions
+  line_13a: 'f2_03', // QBI
   line_13b: 'f2_04',
-  line_14: 'f2_05',   // Total deductions
-  line_15: 'f2_06',   // Taxable income
+  line_14: 'f2_05', // Total deductions
+  line_15: 'f2_06', // Taxable income
   line_16_form: 'f2_07',
-  line_16: 'f2_08',   // Tax
+  line_16: 'f2_08', // Tax
   line_17: 'f2_09',
   line_18: 'f2_10',
   line_19: 'f2_11',
@@ -91,25 +112,26 @@ export const F1040_FIELDS: Record<string, string> = {
   line_21: 'f2_13',
   line_22: 'f2_14',
   line_23: 'f2_15',
-  line_24: 'f2_16',   // Total tax
+  line_24: 'f2_16', // Total tax
   line_25a: 'f2_17',
   line_25b: 'f2_18',
   line_25c: 'f2_19',
   line_25d: 'f2_20',
   line_26: 'f2_21',
   line_27a: 'f2_23',
+  line_27c: 'c2_13', // Election not to claim EIC (not an age test)
   line_28: 'f2_24',
   line_29: 'f2_25',
   line_30: 'f2_26',
   line_31: 'f2_27',
   line_32: 'f2_28',
-  line_33: 'f2_29',   // Total payments
+  line_33: 'f2_29', // Total payments
   line_34: 'f2_30',
-  line_35a: 'f2_31',  // Refund
+  line_35a: 'f2_31', // Refund
   routing_number: 'f2_32',
   account_number: 'f2_33',
   line_36: 'f2_34',
-  line_37: 'f2_35',   // Amount owed
+  line_37: 'f2_35', // Amount owed
   line_38: 'f2_36',
   // Sign here
   designee_name: 'f2_37',
@@ -120,7 +142,7 @@ export const F1040_FIELDS: Record<string, string> = {
   spouse_occupation: 'f2_42',
   spouse_ip_pin: 'f2_43',
   phone: 'f2_44',
-  email: 'f2_45',
+  email: 'f2_45'
 }
 
 // Schedule 1
@@ -193,7 +215,7 @@ export const SCHEDULE1_FIELDS: Record<string, string> = {
   line_24k: 'f2_27',
   line_24z_desc: 'f2_28',
   line_24z: 'f2_29',
-  line_25: 'f2_30',
+  line_25: 'f2_30'
 }
 
 // Schedule A
@@ -227,10 +249,10 @@ export const SCHEDULE_A_FIELDS: Record<string, string> = {
   line_13: 'f1_25',
   line_14: 'f1_26',
   line_15: 'f1_27',
-  line_16: 'f1_28',
-  line_17: 'f1_29',
-  line_18: 'f1_30',
-  itemize_check: 'c1_3',
+  line_16_desc: 'f1_28',
+  line_16: 'f1_29',
+  line_17: 'f1_30',
+  line_18: 'c1_3'
 }
 
 // Schedule 2 — Additional Taxes
@@ -256,8 +278,8 @@ export const SCHEDULE2_FIELDS: Record<string, string> = {
   line_8: 'f1_17',
   line_9: 'f1_18',
   line_10: 'f1_19',
-  line_11: 'f1_20',  // Additional Medicare Tax
-  line_12: 'f1_21',  // NIIT
+  line_11: 'f1_20', // Additional Medicare Tax
+  line_12: 'f1_21', // NIIT
   line_13: 'f1_22',
   line_14: 'f1_23',
   line_15: 'f1_24',
@@ -286,7 +308,7 @@ export const SCHEDULE2_FIELDS: Record<string, string> = {
   line_18: 'f2_21',
   line_19: 'f2_22',
   line_20: 'f2_23',
-  line_21: 'f2_24',
+  line_21: 'f2_24'
 }
 
 // Form 8889 — HSA
@@ -307,7 +329,7 @@ export const F8889_FIELDS: Record<string, string> = {
   line_10: 'f1_11',
   line_11: 'f1_12',
   line_12: 'f1_13',
-  line_13: 'f1_14',  // HSA deduction
+  line_13: 'f1_14', // HSA deduction
   // Part II
   line_14a: 'f1_15',
   line_14b: 'f1_16',
@@ -319,5 +341,5 @@ export const F8889_FIELDS: Record<string, string> = {
   line_18: 'f1_21',
   line_19: 'f1_22',
   line_20: 'f1_23',
-  line_21: 'f1_24',
+  line_21: 'f1_24'
 }

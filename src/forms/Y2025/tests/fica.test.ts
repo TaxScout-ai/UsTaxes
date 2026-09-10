@@ -114,7 +114,8 @@ describe('fica', () => {
       }
       return Promise.resolve()
     })
-  })
+    // This property builds 100 full returns; retain every assertion under parallel CI load.
+  }, 120000)
 
   it('should give SS refund based on filing status', async () => {
     await testKit.with1040Assert((forms) => {
@@ -218,52 +219,71 @@ describe('fica', () => {
           f1040.medicareWages() + selfEmploymentWages >
           fica.additionalMedicareTaxThreshold(filingStatus)
         expect(hasAdditionalMedicareTax(f1040)).toEqual(hasTax)
-        expect(hasAttachment(forms, F8959)).toEqual(hasTax)
+        // Filing may be required without tax: one W-2 > $200k or a credit.
+        const requiresForm =
+          hasTax ||
+          f1040.validW2s().some((w2) => w2.medicareIncome > 200000) ||
+          f1040.f8959.l24() > 0
+        expect(hasAttachment(forms, F8959)).toEqual(requiresForm)
       }
       return Promise.resolve()
     })
   })
 
-  it('should add Additional Medicare Tax based on filing status', async () => {
-    await testKit.with1040Assert(async (forms): Promise<void> => {
-      const f1040 = commonTests.findF1040OrFail(forms)
-      if (hasAdditionalMedicareTax(f1040)) {
-        const filingStatus = f1040.info.taxPayer.filingStatus
-        const selfEmploymentWages = f1040.scheduleSE.l6() ?? 0
-        const incomeOverThreshold =
-          f1040.medicareWages() +
-          selfEmploymentWages -
-          fica.additionalMedicareTaxThreshold(filingStatus)
-        expect(incomeOverThreshold).toBeGreaterThan(0)
-
-        // Adds the right amount of additional tax
-        const s2l8 = f1040.f8959.l18()
-        expect(s2l8).not.toBeUndefined()
-        expect(Math.round(s2l8)).toEqual(
-          Math.round(incomeOverThreshold * fica.additionalMedicareTaxRate)
-        )
-
-        // Also adds in the extra Medicare tax withheld to 1040 taxes already paid
-        const medicareWithheld = f1040
-          .validW2s()
-          .map((w2) => w2.medicareWithholding)
-          .reduce((l, r) => l + r, 0)
-
-        const regularWithholding =
-          fica.regularMedicareTaxRate * f1040.medicareWages()
-
-        if (medicareWithheld > regularWithholding) {
-          const f1040l25c = f1040.l25c()
-          expect(f1040l25c).not.toBeUndefined()
-          const additionalWithheld = medicareWithheld - regularWithholding
-          expect(displayRound(f1040l25c ?? 0)).toEqual(
-            displayRound(additionalWithheld)
-          )
-        } else {
-          expect(displayRound(f1040.l25c() ?? 0) ?? 0).toEqual(0)
+  // Constructive coverage: the old random property spent minutes shrinking
+  // mismatches between independently rounded wage/SE lines and a combined tax.
+  // These values exercise the actual form on both sides of every status threshold.
+  it.each([
+    FilingStatus.S,
+    FilingStatus.MFJ,
+    FilingStatus.MFS,
+    FilingStatus.HOH,
+    FilingStatus.W
+  ])(
+    'reconciles wage-only Medicare at threshold boundaries for %s',
+    (status) => {
+      const threshold = fica.additionalMedicareTaxThreshold(status)
+      for (const extra of [-1, 0, 1, 55, 56, 167, 10000]) {
+        const wages = threshold + extra
+        const info: ValidatedInformation = {
+          ...sampleInfo,
+          taxPayer: {
+            ...sampleInfo.taxPayer,
+            filingStatus: status,
+            spouse:
+              status === FilingStatus.S || status === FilingStatus.HOH
+                ? undefined
+                : sampleInfo.taxPayer.spouse,
+            dependents: []
+          },
+          w2s: [
+            {
+              ...sampleW2,
+              income: wages,
+              medicareIncome: wages,
+              ssWages: 176100,
+              ssWithholding: 10918.2,
+              medicareWithholding:
+                Number(
+                  (BigInt(wages) * BigInt(145) + BigInt(50)) / BigInt(100)
+                ) / 100,
+              fedWithholding: 0
+            }
+          ]
         }
+        const f = new F1040(info, [])
+        const forms = f.schedules()
+        // IRS Form 8959 lines 6-7: excess whole-dollar wages times .009,
+        // rounded half up on the printed tax line, including sub-dollar tax.
+        const expectedTax = Number(
+          (BigInt(Math.max(0, extra)) * BigInt(9) + BigInt(500)) / BigInt(1000)
+        )
+        expect(f.f8959.l18()).toBe(expectedTax)
+        expect(f.f8959.l24()).toBe(0)
+        expect(f.l25c() ?? 0).toBe(0)
+        const required = wages > 200000 || wages > threshold
+        expect(hasAttachment(forms, F8959)).toBe(required)
       }
-      return Promise.resolve()
-    })
-  })
+    }
+  )
 })

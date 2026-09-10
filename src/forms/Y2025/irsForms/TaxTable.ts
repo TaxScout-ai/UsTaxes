@@ -51,10 +51,44 @@ const computeTax =
       .sum()
       .value()
 
-export const computeOrdinaryTax = computeTax(
-  (status) => federalBrackets.ordinary.status[status].brackets,
-  federalBrackets.ordinary.rates
-)
+/** Exact progressive arithmetic; the published Tax Table uses band midpoints.
+ * Return the rational worksheet amount; F1040 records its rounded line value.
+ * The complete published table is independently checked, not generated here.
+ */
+export const computeOrdinaryTax = (
+  status: FilingStatus,
+  income: number
+): number => {
+  if (!Number.isFinite(income) || income < 0)
+    throw new Error('Invalid taxable income')
+  if (income < 5) return 0
+  let basis = income
+  if (income < 25) basis = Math.floor(income / 5) * 5 + 2.5
+  else if (income < 3000) basis = Math.floor(income / 25) * 25 + 12.5
+  else if (income < 100000) basis = Math.floor(income / 50) * 50 + 25
+  // A worksheet intermediate can have more than two decimals. Interpret its
+  // round-trip decimal exactly; source money is validated at the API boundary.
+  const match = /^(\d+)(?:\.(\d+))?(?:e([+-]?\d+))?$/.exec(String(basis))
+  if (!match) throw new Error('Invalid tax basis')
+  const fraction = match[2] ?? ''
+  const scale = fraction.length - Number(match[3] ?? 0)
+  const denominator = BigInt(10) ** BigInt(Math.max(0, scale))
+  const amount =
+    BigInt(match[1] + fraction) * BigInt(10) ** BigInt(Math.max(0, -scale))
+  const brackets = federalBrackets.ordinary.status[status].brackets
+  const rates = federalBrackets.ordinary.rates
+  let total = BigInt(0)
+  let lower = BigInt(0)
+  for (let i = 0; i < rates.length; i++) {
+    const upper =
+      i < brackets.length ? BigInt(brackets[i]) * denominator : amount
+    const taxable = (amount < upper ? amount : upper) - lower
+    if (taxable > BigInt(0)) total += taxable * BigInt(rates[i])
+    if (amount <= upper) break
+    lower = upper
+  }
+  return Number(total) / Number(denominator * BigInt(100))
+}
 
 export const computeLongTermCapGainsTax = computeTax(
   (status) => federalBrackets.longTermCapGains.status[status].brackets,

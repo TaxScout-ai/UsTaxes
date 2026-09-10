@@ -142,9 +142,26 @@ export default class ScheduleEIC extends F1040Attachment {
 
   // 4.1 - covered by income limit check
   //
-  // TODO: ('4.2: Not checking taxpayer age') 4
+  // TY2025 Pub. 596, Rule 11: born after Dec 31, 1960 and before
+  // Jan 2, 2001. Either spouse may satisfy this rule on a joint return.
   over25Under65 = (): boolean => {
-    return true
+    const p = this.f1040.info.taxPayer
+    const people = this.jointReturn()
+      ? [p.primaryPerson, p.spouse]
+      : [p.primaryPerson]
+    return people.some((person) => {
+      const date = person?.dateOfBirth
+      if (!date || !Number.isFinite(date.getTime())) return false
+      const day = Date.UTC(
+        date.getUTCFullYear(),
+        date.getUTCMonth(),
+        date.getUTCDate()
+      )
+      return (
+        day >= Date.UTC(CURRENT_YEAR - 64, 0, 1) &&
+        day <= Date.UTC(CURRENT_YEAR - 24, 0, 1)
+      )
+    })
   }
 
   //
@@ -189,8 +206,7 @@ export default class ScheduleEIC extends F1040Attachment {
   }
 
   // 5.1.8 - Nontaxable combat pay (W-2 box 12 code Q)
-  nontaxableCombatPay = (): number =>
-    this.f1040.nonTaxableCombatPay() ?? 0
+  nontaxableCombatPay = (): number => this.f1040.nonTaxableCombatPay() ?? 0
 
   // 5.1 - Earned income
   earnedIncome = (): number => {
@@ -282,6 +298,7 @@ export default class ScheduleEIC extends F1040Attachment {
   allowed = (): boolean => {
     return (
       // Step 1
+      (this.atLeastOneChild() || this.over25Under65()) &&
       this.passIncomeLimit() &&
       this.validSSNs() &&
       this.allowedFilingStatus() &&

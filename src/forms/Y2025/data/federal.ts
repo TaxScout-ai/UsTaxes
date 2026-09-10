@@ -34,7 +34,7 @@ const federalBrackets: FederalBrackets = {
     rates: [10, 12, 22, 24, 32, 35, 37],
     status: {
       [FilingStatus.S]: {
-        brackets: [11925, 48475, 103350, 191950, 243725, 609350],
+        brackets: [11925, 48475, 103350, 197300, 250525, 626350],
         deductions: [
           {
             name: 'Standard Deduction (Single)',
@@ -57,7 +57,7 @@ const federalBrackets: FederalBrackets = {
         ]
       },
       [FilingStatus.MFJ]: {
-        brackets: [23850, 96950, 206700, 383900, 487450, 731200],
+        brackets: [23850, 96950, 206700, 394600, 501050, 751600],
         deductions: [
           {
             name: 'Standard Deduction (Married)',
@@ -88,7 +88,7 @@ const federalBrackets: FederalBrackets = {
         ]
       },
       [FilingStatus.W]: {
-        brackets: [23850, 96950, 206700, 383900, 487450, 731200],
+        brackets: [23850, 96950, 206700, 394600, 501050, 751600],
         deductions: [
           {
             name: 'Standard Deduction (Widowed)',
@@ -111,7 +111,7 @@ const federalBrackets: FederalBrackets = {
         ]
       },
       [FilingStatus.MFS]: {
-        brackets: [11925, 48475, 103350, 191950, 243725, 365600],
+        brackets: [11925, 48475, 103350, 197300, 250525, 375800],
         deductions: [
           {
             name: 'Standard Deduction (Married Filing Separately)',

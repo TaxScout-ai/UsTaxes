@@ -2,6 +2,11 @@ import Fill from '../pdfFiller/Fill'
 
 export type FormTag = string
 
+export interface FormStatement {
+  title: string
+  lines: string[]
+}
+
 /**
  * Base interface for what every form implementation should include.
  * Any PDF can be filled from an array of values.
@@ -12,6 +17,8 @@ export default abstract class Form extends Fill {
   abstract tag: FormTag
   // Match the sequence number in the header of the PDF.
   abstract sequenceIndex: number
+
+  supportingStatements = (): FormStatement[] => []
 
   public toString = (): string => `
     Form ${this.tag}, at sequence ${this.sequenceIndex}
