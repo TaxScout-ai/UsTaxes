@@ -29,21 +29,17 @@ export function createPdfDownloader(
 ): PDFDownloader {
   const year = templateYear(taxYear)
   // formsDirectory is trusted deployment configuration, never an HTTP parameter.
-  const root = realpathSync(formsDirectory)
+  const root = resolve(realpathSync(formsDirectory), year)
   return async (url: string): Promise<PDFDocument> => {
     const template = relativeTemplatePath(url)
-    const filePath = realpathSync(resolve(root, year, template))
-    const withinRoot = relative(root, filePath)
-    if (
-      !withinRoot ||
-      isAbsolute(withinRoot) ||
-      withinRoot === '..' ||
-      withinRoot.startsWith('..' + (process.platform === 'win32' ? '\\' : '/'))
-    ) {
+    const filePath = realpathSync(resolve(root, template))
+    // Preserve main's per-year boundary after resolving the actual target.
+    // A file or year-directory symlink may not cross into a different tax year.
+    const within = relative(root, filePath)
+    if (!within || within.startsWith('..') || isAbsolute(within))
       throw new Error(
-        'PDF template resolves outside the configured forms directory'
+        'PDF template resolves outside the configured tax-year forms directory'
       )
-    }
     const bytes = readFileSync(filePath)
     return PDFDocument.load(bytes)
   }

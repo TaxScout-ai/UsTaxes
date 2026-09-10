@@ -73,8 +73,29 @@ describe('PDF template filesystem boundary', () => {
     symlinkSync(outside, join(folder, 'f1040.pdf'))
     await expect(
       createPdfDownloader('Y2025', root)('irs/f1040.pdf')
-    ).rejects.toThrow('outside the configured forms directory')
+    ).rejects.toThrow('outside the configured tax-year forms directory')
   })
+  it.each(['file', 'year-directory'])(
+    'rejects a %s symlink into another tax year',
+    async (kind) => {
+      const root = join(directory, 'forms')
+      const old = join(root, 'Y2024', 'irs')
+      mkdirSync(old, { recursive: true })
+      const pdf = await PDFDocument.create()
+      pdf.addPage()
+      writeFileSync(join(old, 'f1040.pdf'), await pdf.save())
+      if (kind === 'file') {
+        mkdirSync(join(root, 'Y2025', 'irs'), { recursive: true })
+        symlinkSync(
+          join(old, 'f1040.pdf'),
+          join(root, 'Y2025', 'irs', 'f1040.pdf')
+        )
+      } else symlinkSync(join(root, 'Y2024'), join(root, 'Y2025'))
+      await expect(
+        createPdfDownloader('Y2025', root)('irs/f1040.pdf')
+      ).rejects.toThrow('outside the configured tax-year forms directory')
+    }
+  )
   it('accepts every existing bundled PDF path without relaxing traversal guards', () => {
     const root = join(process.cwd(), 'public/forms')
     let count = 0

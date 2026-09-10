@@ -16,11 +16,17 @@ export interface FileDownloader<T> {
 
 export type PDFDownloader = FileDownloader<PDFDocument>
 
+/** Direct same-origin guard retained from main's CodeQL-reviewed change. */
+const FORM_URL =
+  /^\/forms\/[A-Za-z0-9][A-Za-z0-9_.-]*(?:\/[A-Za-z0-9][A-Za-z0-9_.-]*)*$/
+
 export const downloadPDF: PDFDownloader = async (url) => {
   // Server callers must install the filesystem downloader. This function is
   // exclusively for browser/WebView access to this application's bundled forms.
   if (typeof window === 'undefined')
     throw new Error('Server PDF loading requires a filesystem downloader')
+  if (!FORM_URL.test(url))
+    throw new Error(`Refusing to fetch a form from a non-relative URL: ${url}`)
   const download = await fetch(bundledTemplateUrl(url), { redirect: 'error' })
   if (!download.ok)
     throw new Error(`Bundled PDF template request failed (${download.status})`)
