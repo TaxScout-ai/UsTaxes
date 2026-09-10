@@ -3,6 +3,7 @@ import { FilingStatus, PersonRole } from 'ustaxes/core/data'
 import { FormTag } from 'ustaxes/core/irsForms/Form'
 import { Field } from 'ustaxes/core/pdfFiller'
 import { amt } from '../data/federal'
+import { rateToWholeDollars, roundLine, sumToWholeDollars } from './rounding'
 
 type Part3 = Partial<{
   l12: number
@@ -50,6 +51,8 @@ export default class F6251 extends F1040Attachment {
 
     // TODO: 2. You claim any general business credit, and either line 6 (in Part I) of Form 3800 or line 25 of Form 3800 is more than zero.
 
+    if ((this.f1040.f8801?.credit() ?? 0) > 0) return true
+
     // TODO: 3. You claim the qualified electric vehicle credit (Form 8834), the personal use part of the alternative fuel vehicle refueling property credit (Form 8911), or the credit for prior year minimum tax (Form 8801).
 
     // 4. The total of Form 6251, lines 2c through 3, is negative and line 7 would be greater than line 10 if you didn’t take into account lines 2c through 3.
@@ -79,13 +82,11 @@ export default class F6251 extends F1040Attachment {
     return false
   }
 
-  l1 = (): number | undefined => {
-    const l15 = this.f1040.l15()
-    if (l15 !== 0) {
-      return l15
-    }
-    return this.f1040.l11() - this.f1040.l14()
-  }
+  l1a = (): number =>
+    roundLine(this.f1040.l14() - (this.f1040.schedule1A?.l37() ?? 0))
+  l1b = (): number => roundLine(this.f1040.l11() - this.l1a())
+  // Compatibility alias for callers predating the TY2025 split of line 1.
+  l1 = (): number => this.l1b()
 
   l2a = (): number | undefined => {
     if (this.f1040.scheduleA.isNeeded()) {
@@ -171,41 +172,57 @@ export default class F6251 extends F1040Attachment {
   // TODO: Other adjustments, including income-based related adjustments
   l3 = (): number | undefined => undefined
 
-  l4 = (additionalAmount = 0): number | undefined =>
-    additionalAmount +
-    (this.l1() ?? 0) +
-    (this.l2a() ?? 0) -
-    (this.l2b() ?? 0) +
-    (this.l2c() ?? 0) +
-    (this.l2d() ?? 0) +
-    (this.l2e() ?? 0) -
-    (this.l2f() ?? 0) +
-    (this.l2g() ?? 0) +
-    (this.l2h() ?? 0) +
-    (this.l2i() ?? 0) +
-    (this.l2j() ?? 0) +
-    (this.l2k() ?? 0) +
-    (this.l2l() ?? 0) +
-    (this.l2m() ?? 0) +
-    (this.l2n() ?? 0) +
-    (this.l2o() ?? 0) +
-    (this.l2p() ?? 0) +
-    (this.l2q() ?? 0) +
-    (this.l2r() ?? 0) -
-    (this.l2s() ?? 0) +
-    (this.l2t() ?? 0) +
-    (this.l3() ?? 0)
+  l4 = (additionalAmount = 0): number => {
+    const total = sumToWholeDollars(
+      [
+        additionalAmount,
+        this.l1b(),
+        this.l2a() ?? 0,
+        -(this.l2b() ?? 0),
+        this.l2c() ?? 0,
+        this.l2d() ?? 0,
+        this.l2e() ?? 0,
+        -(this.l2f() ?? 0),
+        this.l2g() ?? 0,
+        this.l2h() ?? 0,
+        roundLine(this.l2i() ?? 0),
+        this.l2j() ?? 0,
+        this.l2k() ?? 0,
+        this.l2l() ?? 0,
+        this.l2m() ?? 0,
+        this.l2n() ?? 0,
+        this.l2o() ?? 0,
+        this.l2p() ?? 0,
+        this.l2q() ?? 0,
+        this.l2r() ?? 0,
+        -(this.l2s() ?? 0),
+        this.l2t() ?? 0,
+        this.l3() ?? 0
+      ].map(roundLine),
+      'Form 6251 line 4'
+    )
+    return this.f1040.info.taxPayer.filingStatus === FilingStatus.MFS &&
+      total > 900350
+      ? total +
+          Math.min(
+            68500,
+            rateToWholeDollars(
+              total - 900350,
+              25,
+              100,
+              'Form 6251 MFS adjustment'
+            )
+          )
+      : total
+  }
 
   l5 = (additionalAmount = 0): number | undefined => {
-    const l4 = this.l4(additionalAmount) ?? 0
+    const l4 = this.l4(additionalAmount)
     return amt.excemption(this.f1040.info.taxPayer.filingStatus, l4)
   }
 
   l6 = (additionalAmount = 0): number =>
-    Math.max(
-      0,
-      (this.l4(additionalAmount) ?? 0) - (this.l5(additionalAmount) ?? 0)
-    )
+    Math.max(0, this.l4(additionalAmount) - (this.l5(additionalAmount) ?? 0))
 
   requiresPartIII = (): boolean => {
     // If you reported capital gain distributions directly on Form 1040 or 1040-SR, line 7;
@@ -213,8 +230,8 @@ export default class F6251 extends F1040Attachment {
     // or you had a gain on both lines 15 and 16 of Schedule D (Form 1040) (as refigured for the AMT, if necessary),
     // complete Part III on the back and enter the amount from line 40 here.
     return (
-      this.f1040.l7() !== undefined ||
-      this.f1040.l3a() !== undefined ||
+      (this.f1040.l7() ?? 0) > 0 ||
+      (this.f1040.l3a() ?? 0) > 0 ||
       (this.f1040.scheduleD.l15() > 0 && this.f1040.scheduleD.l16() > 0)
     )
   }
@@ -236,17 +253,17 @@ export default class F6251 extends F1040Attachment {
 
     // Use line 40 if Part III is required
     if (this.requiresPartIII()) {
-      return this.part3().l40
+      return this.part3(additionalAmount).l40
     }
 
     const cap = amt.cap(this.f1040.info.taxPayer.filingStatus)
 
     if (l6 <= cap) {
-      return l6 * 0.26
+      return rateToWholeDollars(l6, 26, 100, 'Form 6251 line 7')
     }
     // Crossover adjustment = cap * (0.28 - 0.26) = cap * 0.02
-    const crossover = cap * 0.02
-    return l6 * 0.28 - crossover
+    const crossover = cap / 50
+    return rateToWholeDollars(l6, 28, 100, 'Form 6251 line 7') - crossover
   }
 
   // TODO: Alternative minimum tax foreign tax credit
@@ -283,8 +300,9 @@ export default class F6251 extends F1040Attachment {
     return Math.max(0, this.l9() - this.l10())
   }
 
-  part3 = (): Part3 => {
-    if (!this.requiresPartIII()) {
+  part3 = (additionalAmount = 0): Part3 => {
+    // Line 6 directs zero-tax returns past line 7, so Part III stays blank.
+    if (this.l6(additionalAmount) === 0 || !this.requiresPartIII()) {
       return {}
     }
     const fs = this.f1040.info.taxPayer.filingStatus
@@ -294,45 +312,45 @@ export default class F6251 extends F1040Attachment {
 
     const l18Consts: [number, number] = (() => {
       if (this.f1040.info.taxPayer.filingStatus === FilingStatus.MFS) {
-        return [110350, 2207]
+        return [119550, 2391]
       }
-      return [220700, 4414]
+      return [239100, 4782]
     })()
 
     const l19Value: { [k in FilingStatus]: number } = {
-      [FilingStatus.MFJ]: 89950,
-      [FilingStatus.W]: 89950,
-      [FilingStatus.S]: 446275,
-      [FilingStatus.MFS]: 44625,
-      [FilingStatus.HOH]: 59750
+      [FilingStatus.MFJ]: 96700,
+      [FilingStatus.W]: 96700,
+      [FilingStatus.S]: 48350,
+      [FilingStatus.MFS]: 48350,
+      [FilingStatus.HOH]: 64750
     }
 
     const l25Value: { [k in FilingStatus]: number } = {
-      [FilingStatus.MFJ]: 553850,
-      [FilingStatus.W]: 553850,
-      [FilingStatus.S]: 492300,
-      [FilingStatus.MFS]: 276900,
-      [FilingStatus.HOH]: 523050
+      [FilingStatus.MFJ]: 600050,
+      [FilingStatus.W]: 600050,
+      [FilingStatus.S]: 533400,
+      [FilingStatus.MFS]: 300000,
+      [FilingStatus.HOH]: 566700
     }
 
-    const l12 = this.l6()
+    const l12 = this.l6(additionalAmount)
 
     // TODO - for F2555, see the instructions for amount
     const l13: number = (() => {
       if (usingTaxWorksheet) {
-        return schDWksht.l13() ?? 0
+        return roundLine(schDWksht.l13())
       }
 
-      return qdivWorksheet?.l4() ?? 0
+      return roundLine(qdivWorksheet.l4())
     })()
 
-    const l14 = this.f1040.scheduleD.l19() ?? 0
+    const l14 = roundLine(this.f1040.scheduleD.l19() ?? 0)
 
     const l15 = (() => {
       if (!usingTaxWorksheet) {
         return l13
       }
-      return Math.min(l13 + l14, schDWksht.l10() ?? 0)
+      return Math.min(l13 + l14, roundLine(schDWksht.l10()))
     })()
 
     const l16 = Math.min(l12, l15)
@@ -343,23 +361,19 @@ export default class F6251 extends F1040Attachment {
       const [c1, c2] = l18Consts
 
       if (l17 <= c1) {
-        return l17 * 0.26
+        return rateToWholeDollars(l17, 26, 100, 'Form 6251 line 18')
       }
-      return l17 * 0.28 - c2
+      return rateToWholeDollars(l17, 28, 100, 'Form 6251 line 18') - c2
     })()
 
     const l19 = l19Value[fs]
 
     const l20 = (() => {
       if (usingTaxWorksheet) {
-        return schDWksht.l14() ?? 0
+        return roundLine(schDWksht.l14())
       }
 
-      if (qdivWorksheet !== undefined) {
-        return qdivWorksheet.l5()
-      }
-
-      return Math.max(0, this.f1040.l15())
+      return roundLine(qdivWorksheet.l5())
     })()
 
     const l21 = Math.max(0, l19 - l20)
@@ -377,14 +391,10 @@ export default class F6251 extends F1040Attachment {
     // TODO - see instructions for F2555
     const l27 = (() => {
       if (usingTaxWorksheet) {
-        return schDWksht.l21() ?? 0
+        return roundLine(schDWksht.l21())
       }
 
-      if (qdivWorksheet !== undefined) {
-        return qdivWorksheet.l5()
-      }
-
-      return Math.max(0, this.f1040.l15())
+      return roundLine(qdivWorksheet.l5())
     })()
 
     const l28 = l26 + l27
@@ -393,19 +403,19 @@ export default class F6251 extends F1040Attachment {
 
     const l30 = Math.min(l24, l29)
 
-    const l31 = l30 * 0.15
+    const l31 = rateToWholeDollars(roundLine(l30), 15, 100, 'Form 6251 line 31')
 
     const l32 = l23 + l30
 
     const l33 = l22 - l32
 
-    const l34 = l33 * 0.2
+    const l34 = rateToWholeDollars(roundLine(l33), 20, 100, 'Form 6251 line 34')
 
     const l35 = l17 + l32 + l33
 
     const l36 = l12 - l35
 
-    const l37 = l36 * 0.25
+    const l37 = rateToWholeDollars(roundLine(l36), 25, 100, 'Form 6251 line 37')
 
     const l38 = l18 + l31 + l34 + l37
 
@@ -413,9 +423,9 @@ export default class F6251 extends F1040Attachment {
       // numbers referenced here are the same as l18.
       const [c1, c2] = l18Consts
       if (l12 <= c1) {
-        return l12 * 0.26
+        return rateToWholeDollars(l12, 26, 100, 'Form 6251 line 39')
       }
-      return l12 * 0.28 - c2
+      return rateToWholeDollars(l12, 28, 100, 'Form 6251 line 39') - c2
     })()
 
     const l40 = Math.min(l38, l39)
@@ -455,11 +465,12 @@ export default class F6251 extends F1040Attachment {
 
   fields = (): Field[] => {
     const p3 = this.part3()
-    return [
+    const values: Field[] = [
       this.f1040.namesString(),
       this.f1040.info.taxPayer.primaryPerson.ssid,
       // Part I
-      this.l1(),
+      this.l1a(),
+      this.l1b(),
       this.l2a(),
       this.l2b(),
       this.l2c(),
@@ -521,5 +532,16 @@ export default class F6251 extends F1040Attachment {
       p3.l39,
       p3.l40
     ]
+    return values.map((value) =>
+      typeof value === 'number' ? roundLine(value) : value
+    )
   }
+
+  namedFields = (): Record<string, Field> =>
+    Object.fromEntries(
+      this.fields().map((value, index) => [
+        index < 33 ? `f1_${index + 1}` : `f2_${index - 32}`,
+        value
+      ])
+    )
 }

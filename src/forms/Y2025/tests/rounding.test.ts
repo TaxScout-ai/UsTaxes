@@ -72,10 +72,22 @@ describe('line 16 equals the published Tax Table value', () => {
     }
   )
 
-  it('shows the raw computation is not yet the table value', () => {
-    // 8009.5 is a correct midpoint result and a wrong form line.
-    expect(computeOrdinaryTax(FilingStatus.S, 59_500)).toBe(8009.5)
+  it('returns the actual published integer even when called by a worksheet', () => {
+    expect(computeOrdinaryTax(FilingStatus.S, 59_500)).toBe(8010)
+    expect(computeOrdinaryTax(FilingStatus.S, 59_499.5)).toBe(8010)
   })
+
+  it.each([
+    [59499.49, 7999],
+    [59499.5, 8010],
+    [4249.49, 423],
+    [4249.5, 428]
+  ])(
+    'selects the table band after recording income %s as a line',
+    (income, tax) => {
+      expect(computeOrdinaryTax(FilingStatus.S, income)).toBe(tax)
+    }
+  )
 
   it('reproduces the reported refund once the lines are whole dollars', () => {
     const tax = roundTaxTableResult(computeOrdinaryTax(FilingStatus.S, 59_500))

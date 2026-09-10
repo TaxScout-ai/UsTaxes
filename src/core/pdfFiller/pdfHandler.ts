@@ -8,6 +8,7 @@ import {
 } from 'pdf-lib'
 import Fill from './Fill'
 import { fillPDF } from './fillPdf'
+import { bundledTemplateUrl } from './templatePath'
 
 export interface FileDownloader<T> {
   (url: string): Promise<T>
@@ -15,18 +16,20 @@ export interface FileDownloader<T> {
 
 export type PDFDownloader = FileDownloader<PDFDocument>
 
-/** The only shape a form request may take: a same-origin path under /forms/. */
+/** Direct same-origin guard retained from main's CodeQL-reviewed change. */
 const FORM_URL =
   /^\/forms\/[A-Za-z0-9][A-Za-z0-9_.-]*(?:\/[A-Za-z0-9][A-Za-z0-9_.-]*)*$/
 
 export const downloadPDF: PDFDownloader = async (url) => {
-  // Every caller builds `/forms/{year}/...`, so that prefix is the whole set of
-  // permitted requests. Anything else — a scheme, a host, a climb out of the
-  // form directory — is refused, and the fetch below can therefore never be
-  // aimed at a remote or link-local address.
+  // Server callers must install the filesystem downloader. This function is
+  // exclusively for browser/WebView access to this application's bundled forms.
+  if (typeof window === 'undefined')
+    throw new Error('Server PDF loading requires a filesystem downloader')
   if (!FORM_URL.test(url))
     throw new Error(`Refusing to fetch a form from a non-relative URL: ${url}`)
-  const download = await fetch(url)
+  const download = await fetch(bundledTemplateUrl(url), { redirect: 'error' })
+  if (!download.ok)
+    throw new Error(`Bundled PDF template request failed (${download.status})`)
   const buffer = await download.arrayBuffer()
   return await PDFDocument.load(buffer)
 }
@@ -34,9 +37,10 @@ export const downloadPDF: PDFDownloader = async (url) => {
 export const combinePdfs = async (
   pdfFiles: PDFDocument[]
 ): Promise<PDFDocument> => {
-  const [head, ...rest] = await Promise.all(
+  const rest = await Promise.all(
     pdfFiles.map(async (pdf) => PDFDocument.load(await pdf.save()))
   )
+  const head = rest.shift()
   if (!head) throw new Error('Cannot combine an empty PDF packet')
 
   // Make sure we combine the documents from left to right and preserve order

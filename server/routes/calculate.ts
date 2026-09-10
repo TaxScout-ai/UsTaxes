@@ -1,6 +1,9 @@
 import F1040For2025 from 'ustaxes/forms/Y2025/irsForms/F1040'
 import { calculationSnapshot } from 'ustaxes/forms/Y2025/irsForms/calculationSnapshot'
-import { parseCalculationRequest } from '../utils/calculation-contract'
+import {
+  calculationRefusalCode,
+  parseCalculationRequest
+} from '../utils/calculation-contract'
 import { Router, Request, Response } from 'express'
 import {
   Information,
@@ -132,7 +135,7 @@ router.post('/api/calculate', (req: Request, res: Response) => {
       res.status(422).json({
         success: false,
         contractVersion: USTAXES_HTTP_CONTRACT_VERSION,
-        error: 'invalid_input',
+        error: calculationRefusalCode(parsed.issues),
         issues: parsed.issues
       })
       return

@@ -3,14 +3,11 @@ import F1040 from '../irsForms/F1040'
 import F8959 from '../irsForms/F8959'
 import Form from 'ustaxes/core/irsForms/Form'
 import Schedule2 from '../irsForms/Schedule2'
-import Schedule3 from '../irsForms/Schedule3'
-import { displayRound } from 'ustaxes/core/irsForms/util'
 import { testKit, commonTests } from '.'
 import { FilingStatus, IncomeW2, PersonRole } from 'ustaxes/core/data'
 import { run } from 'ustaxes/core/util'
 import { blankState } from 'ustaxes/redux/reducer'
 import { ValidatedInformation } from 'ustaxes/forms/F1040Base'
-import * as fc from 'fast-check'
 
 jest.setTimeout(10000)
 
@@ -65,8 +62,6 @@ const sampleInfo: ValidatedInformation = {
   }
 }
 
-const hasSSRefund = (f1040: F1040): boolean => f1040.schedule3.l11() > 0
-
 function hasAdditionalMedicareTax(f1040: F1040): boolean {
   const medicareTax = f1040.f8959.l18()
   return medicareTax > 0
@@ -86,65 +81,10 @@ function hasAttachment<FormType>(
 }
 
 describe('fica', () => {
-  it('should give refund SS tax overpayment only in some conditions', async () => {
-    await testKit.with1040Assert((forms) => {
-      const f1040 = commonTests.findF1040OrFail(forms)
-      const ssRefund = f1040.schedule3.l11()
-      if (f1040.validW2s().length <= 1) {
-        // Should never give SS refund with 1 or fewer W2s
-        expect(ssRefund).toEqual(0)
-      } else {
-        const ssWithheld = f1040
-          .validW2s()
-          .map((w2) => w2.ssWithholding)
-          .reduce((l, r) => l + r, 0)
-        if (
-          f1040.wages() <= fica.maxIncomeSSTaxApplies ||
-          f1040.validW2s().some((w2) => w2.ssWithholding > fica.maxSSTax) ||
-          ssWithheld < fica.maxSSTax
-        ) {
-          // Should never give SS refund if W2 income below max threshold, some W2 has
-          // withheld over the max, or there is no SS withholding to refund.
-          expect(ssRefund).toEqual(0)
-        } else {
-          // Otherwise, should always give SS refund, and attach schedule 3
-          expect(ssRefund).toBeGreaterThan(0)
-          expect(hasAttachment(forms, Schedule3)).toEqual(true)
-        }
-      }
-      return Promise.resolve()
-    })
-    // This property builds 100 full returns; retain every assertion under parallel CI load.
-  }, 120000)
-
-  it('should give SS refund based on filing status', async () => {
-    await testKit.with1040Assert((forms) => {
-      const f1040 = commonTests.findF1040OrFail(forms)
-      if (hasSSRefund(f1040)) {
-        const ssRefund = f1040.schedule3.l11()
-        expect(displayRound(ssRefund)).not.toBeUndefined()
-        expect(ssRefund).toBeGreaterThan(0)
-
-        const ssWithheld =
-          f1040
-            .validW2s()
-            .filter((w2) => w2.personRole == PersonRole.PRIMARY)
-            .map((w2) => w2.ssWithholding)
-            .reduce((l, r) => l + r, 0) +
-          f1040
-            .validW2s()
-            .filter((w2) => w2.personRole == PersonRole.SPOUSE)
-            .map((w2) => w2.ssWithholding)
-            .reduce((l, r) => l + r, 0)
-
-        expect(ssRefund).toEqual(ssWithheld - fica.maxSSTax)
-      } else {
-        fc.pre(false)
-      }
-
-      return Promise.resolve()
-    })
-  })
+  // TAX-4706 replaces two false random assertions with constructive source-based
+  // and split/merge/permutation tests in excessSocialSecurity.test.ts. Box 1 is
+  // not the SS wage base; spouses have separate caps, and W-2 count is not
+  // employer count. No arbitrary facts are filtered until they happen to pass.
 
   it('should not give a refund if each person has less than the max', () => {
     const testInfo: ValidatedInformation = {
@@ -170,7 +110,7 @@ describe('fica', () => {
     expect(f1040.schedule3.claimableExcessSSTaxWithholding()).toEqual(0)
   })
 
-  it('should give a refund if a person has more than the max if they have two w2s', () => {
+  it('claims a spouse excess only for two different employers', () => {
     const testInfo: ValidatedInformation = {
       ...sampleInfo,
       w2s: [
@@ -182,6 +122,7 @@ describe('fica', () => {
         {
           ...sampleW2,
           personRole: PersonRole.SPOUSE,
+          employer: { EIN: '222222222', employerName: 'Second employer' },
           // This person has already contributed to the max for their other w2 so the refund should equal this amount
           ssWithholding: 1000
         },

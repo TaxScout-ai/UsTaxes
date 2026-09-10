@@ -1,6 +1,7 @@
 import federalBrackets from '../data/federal'
 import { FilingStatus } from 'ustaxes/core/data'
 import _ from 'lodash'
+import { roundLine } from './rounding'
 
 const computeTax =
   (brackets: (status: FilingStatus) => number[], rates: number[]) =>
@@ -51,9 +52,10 @@ const computeTax =
       .sum()
       .value()
 
-/** Exact progressive arithmetic; the published Tax Table uses band midpoints.
- * Return the rational worksheet amount; F1040 records its rounded line value.
- * The complete published table is independently checked, not generated here.
+/** Ordinary tax on a whole-dollar income line. The published Tax Table is
+ * already an integer amount: callers must never receive its fractional midpoint
+ * computation. The same line policy applies to the Tax Computation Worksheet.
+ * The complete table is independently checked against the pinned IRS PDF.
  */
 export const computeOrdinaryTax = (
   status: FilingStatus,
@@ -61,20 +63,16 @@ export const computeOrdinaryTax = (
 ): number => {
   if (!Number.isFinite(income) || income < 0)
     throw new Error('Invalid taxable income')
+  income = roundLine(income)
   if (income < 5) return 0
   let basis = income
   if (income < 25) basis = Math.floor(income / 5) * 5 + 2.5
   else if (income < 3000) basis = Math.floor(income / 25) * 25 + 12.5
   else if (income < 100000) basis = Math.floor(income / 50) * 50 + 25
-  // A worksheet intermediate can have more than two decimals. Interpret its
-  // round-trip decimal exactly; source money is validated at the API boundary.
-  const match = /^(\d+)(?:\.(\d+))?(?:e([+-]?\d+))?$/.exec(String(basis))
-  if (!match) throw new Error('Invalid tax basis')
-  const fraction = match[2] ?? ''
-  const scale = fraction.length - Number(match[3] ?? 0)
-  const denominator = BigInt(10) ** BigInt(Math.max(0, scale))
-  const amount =
-    BigInt(match[1] + fraction) * BigInt(10) ** BigInt(Math.max(0, -scale))
+  // The basis is now a whole dollar or a table midpoint ending in .5. Half
+  // dollars represent both exactly; roundLine's range bound keeps *2 safe.
+  const denominator = BigInt(2)
+  const amount = BigInt(basis * 2)
   const brackets = federalBrackets.ordinary.status[status].brackets
   const rates = federalBrackets.ordinary.rates
   let total = BigInt(0)
@@ -87,7 +85,8 @@ export const computeOrdinaryTax = (
     if (amount <= upper) break
     lower = upper
   }
-  return Number(total) / Number(denominator * BigInt(100))
+  const divisor = denominator * BigInt(100)
+  return Number((total + divisor / BigInt(2)) / divisor)
 }
 
 export const computeLongTermCapGainsTax = computeTax(

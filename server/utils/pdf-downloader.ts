@@ -1,8 +1,12 @@
 import { PDFDocument } from 'pdf-lib'
-import { readFileSync } from 'fs'
-import { join, resolve, relative, isAbsolute } from 'path'
+import { readFileSync, realpathSync } from 'fs'
+import { join, relative, isAbsolute, resolve } from 'path'
 import { PDFDownloader } from 'ustaxes/core/pdfFiller/pdfHandler'
 import { TaxYear } from 'ustaxes/core/data'
+import {
+  relativeTemplatePath,
+  templateYear
+} from 'ustaxes/core/pdfFiller/templatePath'
 
 /**
  * PDF forms base directory. In the Docker image, these are
@@ -19,18 +23,22 @@ const FORMS_DIR = process.env.FORMS_DIR ?? join(__dirname, '../../public/forms')
  * The default downloader in CreateForms prepends `/forms/{year}/`, but
  * setDownloader bypasses that. So we need to add the year prefix here.
  */
-export function createPdfDownloader(taxYear: TaxYear): PDFDownloader {
-  const root = resolve(FORMS_DIR, taxYear)
+export function createPdfDownloader(
+  taxYear: TaxYear,
+  formsDirectory = FORMS_DIR
+): PDFDownloader {
+  const year = templateYear(taxYear)
+  // formsDirectory is trusted deployment configuration, never an HTTP parameter.
+  const root = resolve(realpathSync(formsDirectory), year)
   return async (url: string): Promise<PDFDocument> => {
-    const filePath = resolve(root, url)
-    // Form paths come from the form definitions, never from the request body.
-    // This keeps it that way: a path that climbs out of the year's form
-    // directory is refused instead of read, so a future caller that forwards
-    // request data here cannot turn it into an arbitrary file read.
+    const template = relativeTemplatePath(url)
+    const filePath = realpathSync(resolve(root, template))
+    // Preserve main's per-year boundary after resolving the actual target.
+    // A file or year-directory symlink may not cross into a different tax year.
     const within = relative(root, filePath)
-    if (within.startsWith('..') || isAbsolute(within))
+    if (!within || within.startsWith('..') || isAbsolute(within))
       throw new Error(
-        `Refusing to read a form outside the ${taxYear} form directory: ${url}`
+        'PDF template resolves outside the configured tax-year forms directory'
       )
     const bytes = readFileSync(filePath)
     return PDFDocument.load(bytes)

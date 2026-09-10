@@ -16,7 +16,7 @@ const getTaxTable = async (): Promise<number[][]> => {
 }
 
 const expectTax = (status: FilingStatus, amount: number, tax: number) => {
-  const computedTax = Math.round(computeOrdinaryTax(status, amount))
+  const computedTax = computeOrdinaryTax(status, amount)
   expect(computedTax).toEqual(tax)
 }
 
@@ -26,6 +26,7 @@ const expectTaxUnder100KRange = (
   max: number,
   tax: number
 ) => {
+  // This engine uses whole-dollar form lines before selecting a table band.
   const diff = max - min
   const quarter = Math.round((diff / 4) * 100) / 100
   expectTax(status, min, tax)
@@ -43,7 +44,7 @@ describe('Tax rates', () => {
   it('ordinary taxes for single status should be correct', async () => {
     const rows = await getTaxTable()
     rows.forEach(([min, lessThan, tax]) => {
-      expectTaxUnder100KRange(FilingStatus.S, min, lessThan - 0.01, tax)
+      expectTaxUnder100KRange(FilingStatus.S, min, lessThan - 1, tax)
     })
 
     // Over $100,000
@@ -67,7 +68,7 @@ describe('Tax rates', () => {
   it('ordinary taxes for married filing jointly status should be correct', async () => {
     const rows = await getTaxTable()
     rows.forEach(([min, lessThan, , tax]) => {
-      expectTaxUnder100KRange(FilingStatus.MFJ, min, lessThan - 0.01, tax)
+      expectTaxUnder100KRange(FilingStatus.MFJ, min, lessThan - 1, tax)
     })
 
     // Over $100,000
@@ -91,7 +92,7 @@ describe('Tax rates', () => {
   it('ordinary taxes for married filing separately status should be correct', async () => {
     const rows = await getTaxTable()
     rows.forEach(([min, lessThan, , , tax]) => {
-      expectTaxUnder100KRange(FilingStatus.MFS, min, lessThan - 0.01, tax)
+      expectTaxUnder100KRange(FilingStatus.MFS, min, lessThan - 1, tax)
     })
 
     // Over $100,000
@@ -115,7 +116,7 @@ describe('Tax rates', () => {
   it('ordinary taxes for head of household status should be correct', async () => {
     const rows = await getTaxTable()
     rows.forEach(([min, lessThan, , , , tax]) => {
-      expectTaxUnder100KRange(FilingStatus.HOH, min, lessThan - 0.01, tax)
+      expectTaxUnder100KRange(FilingStatus.HOH, min, lessThan - 1, tax)
     })
 
     // Over $100,000

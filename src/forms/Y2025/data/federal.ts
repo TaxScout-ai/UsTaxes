@@ -1,3 +1,4 @@
+import { rateToWholeDollars } from '../irsForms/rounding'
 import { FilingStatus } from 'ustaxes/core/data'
 import { linear, Piecewise } from 'ustaxes/core/util'
 
@@ -239,39 +240,29 @@ export const healthSavingsAccounts = {
 // https://www.irs.gov/newsroom/irs-provides-tax-inflation-adjustments-for-tax-year-2025
 // https://www.irs.gov/instructions/i6251
 export const amt = {
-  excemption: (
-    filingStatus: FilingStatus,
-    income: number
-  ): number | undefined => {
-    switch (filingStatus) {
-      case FilingStatus.S:
-      case FilingStatus.HOH:
-      case FilingStatus.W:
-        if (income <= 626350) {
-          return 88100
-        }
-        break
-      case FilingStatus.MFJ:
-        if (income <= 1252700) {
-          return 137000
-        }
-        break
-      case FilingStatus.MFS:
-        if (income <= 68500) {
-          return 68500
-        }
-    }
-    // TODO: Handle "Exemption Worksheet"
-    return undefined
+  // Retain the historical public spelling; all amounts are whole form lines.
+  excemption: (filingStatus: FilingStatus, income: number): number => {
+    const joint =
+      filingStatus === FilingStatus.MFJ || filingStatus === FilingStatus.W
+    const exemption = joint
+      ? 137000
+      : filingStatus === FilingStatus.MFS
+      ? 68500
+      : 88100
+    const start = joint ? 1252700 : 626350
+    return Math.max(
+      0,
+      exemption -
+        rateToWholeDollars(
+          Math.max(0, income - start),
+          25,
+          100,
+          'Form 6251 exemption worksheet'
+        )
+    )
   },
-
-  // Used for calculating Line 7 on form 6251. See instructions
-  cap: (filingStatus: FilingStatus): number => {
-    if (filingStatus === FilingStatus.MFS) {
-      return 119600
-    }
-    return 239200
-  }
+  cap: (filingStatus: FilingStatus): number =>
+    filingStatus === FilingStatus.MFS ? 119550 : 239100
 }
 
 // https://www.irs.gov/credits-deductions/individuals/earned-income-tax-credit/earned-income-and-earned-income-tax-credit-eitc-tables#EITC%20Tables
