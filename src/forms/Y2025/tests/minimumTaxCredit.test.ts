@@ -251,6 +251,32 @@ describe('2025 Form 8801 from actual 2024 source lines', () => {
 })
 
 describe('current-year AMT constants and senior adjustment', () => {
+  it('uses the published Tax Table inside the dividend worksheet, not its midpoint fraction', () => {
+    const info = creditInformation()
+    info.f1099s = [
+      {
+        payer: 'Synthetic',
+        type: Income1099Type.DIV,
+        personRole: PersonRole.PRIMARY,
+        form: {
+          dividends: 57,
+          qualifiedDividends: 57,
+          totalCapitalGainsDistributions: 0
+        }
+      }
+    ]
+    const f = new F1040(info, [])
+    // IRS table tax on ordinary taxable income 59500 is 8010; 15% of $57 is
+    // $8.55. The final line is 8019, never round(8009.5 + 8.55) = 8018.
+    // Line 24 is 8021, so the ordinary-tax ceiling does not hide the defect.
+    expect([
+      f.qualifiedAndCapGainsWorksheet.l22(),
+      f.l16(),
+      f.l24(),
+      f.l35a()
+    ]).toEqual([8010, 8019, 3019, 6081])
+    expect(f.f6251.part3()).toEqual({})
+  })
   it('adds back the senior deduction and aligns both new line-1 PDF fields', () => {
     const info = creditInformation(minimumTaxCreditData(), 70000)
     info.taxPayer.primaryPerson.dateOfBirth = new Date('1960-01-01T00:00:00Z')

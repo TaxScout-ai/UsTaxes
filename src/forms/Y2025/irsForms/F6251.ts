@@ -301,7 +301,8 @@ export default class F6251 extends F1040Attachment {
   }
 
   part3 = (additionalAmount = 0): Part3 => {
-    if (!this.requiresPartIII()) {
+    // Line 6 directs zero-tax returns past line 7, so Part III stays blank.
+    if (this.l6(additionalAmount) === 0 || !this.requiresPartIII()) {
       return {}
     }
     const fs = this.f1040.info.taxPayer.filingStatus

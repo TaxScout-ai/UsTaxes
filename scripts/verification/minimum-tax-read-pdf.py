@@ -24,9 +24,15 @@ for case in report['results']:
     data = request['information']['form8801']
     if case['id'] in goldens and data != goldens[case['id']]['data']:
         raise ValueError('Request differs from independently regenerated golden: ' + case['id'])
-    expected, gains = oracle.compute(data)
+    dividends = 57 if case['id'] == 'dividend-table-midpoint' else 0
+    current_tax = 8019 if dividends else 8010  # table(59500)=8010; 15%*57=8.55; ceiling table(59557)=8021
+    if dividends:
+        divs = request['information']['f1099s']
+        if len(divs) != 1 or divs[0]['form']['dividends'] != 57 or divs[0]['form']['qualifiedDividends'] != 57:
+            raise ValueError('Dividend regression request changed')
+    expected, gains = oracle.compute(data, current_tax)
     result = json.loads((root / (case['id'] + '.response.json')).read_text())
-    expected1040 = {'1a': 75250, '15': 59500, '16': 8010, '20': expected['25'] or None, '24': 8010 - expected['25'], '25a': 9100, '35a': 1090 + expected['25']}
+    expected1040 = {'1a': 75250, '15': 59500 + dividends, '16': current_tax, '20': expected['25'] or None, '24': current_tax - expected['25'], '25a': 9100, '35a': 9100 - current_tax + expected['25']}
     for line, value in expected1040.items():
         if result['returnLines']['lines'][line] != value:
             raise ValueError((case['id'], 'HTTP line', line, value))
@@ -60,8 +66,10 @@ for case in report['results']:
         for line in range(27, 56): check('f8801', f'f3_{line - 26}' if line <= 42 else f'f4_{line - 42}', gains.get(str(line)))
         # Actual 2025 Form 6251 has 1a AND 1b; every subsequent field was shifted.
         # Current synthetic wage-only facts give AMTI 75250 below 88100 exemption.
-        fields6251 = {3:15750, 4:59500, 5:15750, 26:75250, 27:88100, 28:0, 29:0, 30:None, 31:0, 32:8010, 33:0}
+        fields6251 = {3:15750, 4:59500+dividends, 5:15750, 26:75250+dividends, 27:88100, 28:0, 29:0, 30:None, 31:0, 32:current_tax, 33:0}
         for field, value in fields6251.items(): check('f6251', f'f1_{field}', value)
+        # Line 6=0 directs all these cases past line 7: Part III must be blank,
+        # including the qualified-dividend case.
         for index in range(1, 30): check('f6251', f'f2_{index}', None)
         if data['priorYear']['foreignEarnedIncome']['applicable'] and expected['10']:
             text = '\n'.join(page.get_text() for page in pdf)

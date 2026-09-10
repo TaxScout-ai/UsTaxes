@@ -41,7 +41,7 @@ def source(income=50000, status='S', **updates):
                 priorYearRegularTaxMinusCredits=p['form6251']['line10'],
                 priorYearAMTCreditCarryforward=p['form8801Line26'])
 
-def compute(data):
+def compute(data, current_tax=8010):
     p = data['priorYear']; status = p['filingStatus']; joint = status in ('MFJ', 'W')
     r = p['form6251']; lines = {}
     lines[1] = total(r['line1'], r['line2e'])
@@ -96,7 +96,7 @@ def compute(data):
     lines[21] = lines[18] + lines[19] + lines[20]
     # All goldens use independently established Single / W-2 $75,250 current facts.
     # IRS 2025 Tax Table [59500,59550): $8,010; current AMTI is below its exemption.
-    lines.update({22: 8010, 23: 0, 24: 8010, 25: max(0, min(lines[21], 8010))})
+    lines.update({22: current_tax, 23: 0, 24: current_tax, 25: max(0, min(lines[21], current_tax))})
     lines[26] = max(0, lines[21] - lines[25])
     return {str(k): v for k, v in sorted(lines.items())}, {str(k): v for k, v in sorted(gains.items())}
 

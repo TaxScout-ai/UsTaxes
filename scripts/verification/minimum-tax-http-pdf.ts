@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto'
 import calculate from '../../server/routes/calculate'
 import pdf from '../../server/routes/generate-pdf'
 import { sourceManifest } from './source-manifest'
-import { Form8801Data } from 'ustaxes/core/data'
+import { Form8801Data, Income1099Type, PersonRole } from 'ustaxes/core/data'
 import {
   creditInformation,
   minimumTaxCreditData,
@@ -75,7 +75,13 @@ async function main() {
     'NR-floor',
     'negative-exclusions-and-NOL'
   ])
-  const cases = goldens.cases.map((c) => ({
+  const cases: Array<{
+    id: string
+    data: Form8801Data
+    credit: number
+    pdf: boolean
+    dividends?: number
+  }> = goldens.cases.map((c) => ({
     id: c.id,
     data: c.data as Form8801Data,
     credit: c.lines['25'],
@@ -86,6 +92,13 @@ async function main() {
     data: minimumTaxCreditData(),
     credit: 5000,
     pdf: true
+  })
+  cases.push({
+    id: 'dividend-table-midpoint',
+    data: minimumTaxCreditData(),
+    credit: 5000,
+    pdf: true,
+    dividends: 57
   })
   const noCredit = minimumTaxCreditData(
     priorReturn({
@@ -106,18 +119,31 @@ async function main() {
         information: creditInformation(c.data),
         assets: []
       }
+      if (c.dividends !== undefined)
+        request.information.f1099s = [
+          {
+            payer: 'Synthetic',
+            type: Income1099Type.DIV,
+            personRole: PersonRole.PRIMARY,
+            form: {
+              dividends: c.dividends,
+              qualifiedDividends: c.dividends,
+              totalCapitalGainsDistributions: 0
+            }
+          }
+        ]
       const response = await post('/api/calculate', request)
       const actual = (await response.json()) as Response
       if (response.status !== 200 || !actual.success)
         throw new Error(`${c.id}: ${JSON.stringify(actual)}`)
       const expected = {
         '1a': 75250,
-        '15': 59500,
-        '16': 8010,
+        '15': 59500 + (c.dividends ?? 0),
+        '16': c.dividends === 57 ? 8019 : 8010,
         '20': c.credit || null,
-        '24': 8010 - c.credit,
+        '24': (c.dividends === 57 ? 8019 : 8010) - c.credit,
         '25a': 9100,
-        '35a': 1090 + c.credit
+        '35a': (c.dividends === 57 ? 1081 : 1090) + c.credit
       }
       for (const [line, value] of Object.entries(expected))
         if (actual.returnLines.lines[line] !== value)

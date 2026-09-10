@@ -30,6 +30,14 @@ The current Form 6251 dependency also required corrections:
 - Qualified-dividend worksheet initialization moved out of reading 1040 line 16. AMT must be identical before and after reading regular tax. The old path
   overstated the high-income synthetic AMT by $16000 when read first.
 
+A further whole-return probe found that the ordinary-tax helper still returned
+8009.5 (the table-band midpoint formula) to the qualified-dividend worksheet,
+although the actual Tax Table says 8010. W-2 wages 75250 plus 57 of qualified
+dividends therefore understated line 16 (8018 instead of 8019) by one dollar. The ordinary-tax helper
+now returns the actual integer table/worksheet result for every caller and
+selects a table band only after rounding its income line. This closes the
+source of the error rather than adding another final-return rounding wrapper.
+
 The Form 6251 MFS line-25 value is 300000, exactly as printed in the pinned
 2025 form and instructions. It is not inferred from half the MFJ threshold.
 
@@ -43,8 +51,8 @@ bad/missing facts and fractional cents. These are synthetic calculations
 derived from IRS forms, not official ATS expected return totals.
 
 One command regenerates/checks the oracle, rebuilds the request schema, makes
-245 calculations and 20 refusal probes through the real local HTTP routes,
-and independently reads 17 produced PDFs using PyMuPDF:
+246 calculations and 20 refusal probes through the real local HTTP routes,
+and independently reads 18 produced PDFs using PyMuPDF:
 
 ```sh
 python scripts/verification/minimum-tax-verify.py /absolute/new/evidence-directory
