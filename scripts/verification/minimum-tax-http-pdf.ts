@@ -254,7 +254,7 @@ async function main() {
         id: 'silent-year-fallback',
         data: base,
         year: 'Y2026',
-        code: 'invalid_input'
+        code: 'unsupported'
       }
     ]
     for (const c of bad)
