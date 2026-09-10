@@ -14,6 +14,16 @@ export interface ContractIssue {
   code: string
   message: string
 }
+
+/** Keep tax-scope refusal distinct from malformed input on both HTTP routes. */
+export function calculationRefusalCode(
+  issues: readonly ContractIssue[]
+): 'invalid_input' | 'unsupported' | 'needs_facts' {
+  if (issues.some((x) => x.code !== 'unsupported' && x.code !== 'needs_facts'))
+    return 'invalid_input'
+  if (issues.some((x) => x.code === 'unsupported')) return 'unsupported'
+  return issues.length ? 'needs_facts' : 'invalid_input'
+}
 const object = (x: unknown): x is Record<string, unknown> =>
   typeof x === 'object' && x !== null && !Array.isArray(x)
 const arrays = [
@@ -84,6 +94,16 @@ export function validateCalculationRequest(raw: unknown): ContractIssue[] {
       if (!validateAsset(asset))
         issue(`/assets/${i}`, 'invalid_input', 'Invalid asset')
   if (issues.length) return issues
+  if (raw.taxYear === 'Y2025') {
+    for (const key of ['rrtaCompensation', 'rrtaTax']) {
+      if (normalized[key] !== undefined && normalized[key] !== 0)
+        issue(
+          `/information/${key}`,
+          'unsupported',
+          'Whole-return RRTA reconciliation needs per-person, per-employer tier 1 Social Security and Medicare amounts; the legacy aggregate only supports the Form 8959 component'
+        )
+    }
+  }
   const validateDates = (value: unknown, path: string): void => {
     if (Array.isArray(value)) {
       value.forEach((v, i) => validateDates(v, `${path}/${i}`))

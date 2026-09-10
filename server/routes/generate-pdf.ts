@@ -1,4 +1,7 @@
-import { parseCalculationRequest } from '../utils/calculation-contract'
+import {
+  calculationRefusalCode,
+  parseCalculationRequest
+} from '../utils/calculation-contract'
 import { Router, Request, Response } from 'express'
 import { USTAXES_HTTP_CONTRACT_VERSION } from 'ustaxes/core/data'
 import { isLeft } from 'ustaxes/core/util'
@@ -16,7 +19,7 @@ async function generatePdf(req: Request, res: Response): Promise<void> {
       res.status(422).json({
         success: false,
         contractVersion: USTAXES_HTTP_CONTRACT_VERSION,
-        error: 'invalid_input',
+        error: calculationRefusalCode(parsed.issues),
         issues: parsed.issues
       })
       return
