@@ -743,51 +743,34 @@ export default class F1040 extends F1040Base {
       'W-2 box 2'
     )
 
-  // tax withheld from all 1099 types (R, SSA, INT, DIV, B, NEC, MISC, G)
-  l25b = (): number => {
-    const from1099R = this.f1099rs().reduce(
-      (res, f1099) => res + f1099.form.federalIncomeTaxWithheld,
-      0
+  // Tax withheld from every 1099 type (R, SSA, INT, DIV, B, NEC, MISC, G) and
+  // from IRA distributions. An IRA-type 1099-R travels as
+  // `individualRetirementArrangements` so that lines 4a/4b can read it, and
+  // that structure carries its own box 4. It was never summed here, so a
+  // traditional IRA distribution with withholding understated the refund.
+  // Every source keeps its cents until the line rounds once, as line 25a does;
+  // the previous float sum could hand the PDF a fractional dollar.
+  l25b = (): number =>
+    sumToWholeDollars(
+      [
+        ...this.f1099rs().map((f) => f.form.federalIncomeTaxWithheld),
+        ...this.info.individualRetirementArrangements.map(
+          (i) => i.federalIncomeTaxWithheld
+        ),
+        ...this.f1099ssas().map((f) => f.form.federalIncomeTaxWithheld),
+        ...this.f1099Ints().map((f) => f.form.federalIncomeTaxWithheld ?? 0),
+        ...this.f1099Divs().map((f) => f.form.federalIncomeTaxWithheld ?? 0),
+        ...this.f1099Bs().map((f) => f.form.federalIncomeTaxWithheld ?? 0),
+        ...(this.info.f1099necs ?? []).map(
+          (f) => f.form.federalIncomeTaxWithheld
+        ),
+        ...(this.info.f1099miscs ?? []).map(
+          (f) => f.form.federalIncomeTaxWithheld
+        ),
+        ...(this.info.f1099gs ?? []).map((f) => f.form.federalIncomeTaxWithheld)
+      ],
+      '1099 box 4'
     )
-    const from1099SSA = this.f1099ssas().reduce(
-      (res, f1099) => res + f1099.form.federalIncomeTaxWithheld,
-      0
-    )
-    const from1099Int = this.f1099Ints().reduce(
-      (res, f1099) => res + (f1099.form.federalIncomeTaxWithheld ?? 0),
-      0
-    )
-    const from1099Div = this.f1099Divs().reduce(
-      (res, f1099) => res + (f1099.form.federalIncomeTaxWithheld ?? 0),
-      0
-    )
-    const from1099B = this.f1099Bs().reduce(
-      (res, f1099) => res + (f1099.form.federalIncomeTaxWithheld ?? 0),
-      0
-    )
-    const from1099NEC = (this.info.f1099necs ?? []).reduce(
-      (res, f1099) => res + f1099.form.federalIncomeTaxWithheld,
-      0
-    )
-    const from1099MISC = (this.info.f1099miscs ?? []).reduce(
-      (res, f1099) => res + f1099.form.federalIncomeTaxWithheld,
-      0
-    )
-    const from1099G = (this.info.f1099gs ?? []).reduce(
-      (res, f1099) => res + f1099.form.federalIncomeTaxWithheld,
-      0
-    )
-    return (
-      from1099R +
-      from1099SSA +
-      from1099Int +
-      from1099Div +
-      from1099B +
-      from1099NEC +
-      from1099MISC +
-      from1099G
-    )
-  }
 
   // TODO: form(s) W-2G box 4, schedule K-1, form 1042-S, form 8805, form 8288-A
   /**
