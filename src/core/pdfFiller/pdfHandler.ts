@@ -8,6 +8,7 @@ import {
 } from 'pdf-lib'
 import Fill from './Fill'
 import { fillPDF } from './fillPdf'
+import { bundledTemplateUrl } from './templatePath'
 
 export interface FileDownloader<T> {
   (url: string): Promise<T>
@@ -16,7 +17,13 @@ export interface FileDownloader<T> {
 export type PDFDownloader = FileDownloader<PDFDocument>
 
 export const downloadPDF: PDFDownloader = async (url) => {
-  const download = await fetch(url)
+  // Server callers must install the filesystem downloader. This function is
+  // exclusively for browser/WebView access to this application's bundled forms.
+  if (typeof window === 'undefined')
+    throw new Error('Server PDF loading requires a filesystem downloader')
+  const download = await fetch(bundledTemplateUrl(url), { redirect: 'error' })
+  if (!download.ok)
+    throw new Error(`Bundled PDF template request failed (${download.status})`)
   const buffer = await download.arrayBuffer()
   return await PDFDocument.load(buffer)
 }
@@ -24,9 +31,10 @@ export const downloadPDF: PDFDownloader = async (url) => {
 export const combinePdfs = async (
   pdfFiles: PDFDocument[]
 ): Promise<PDFDocument> => {
-  const [head, ...rest] = await Promise.all(
+  const rest = await Promise.all(
     pdfFiles.map(async (pdf) => PDFDocument.load(await pdf.save()))
   )
+  const head = rest.shift()
   if (!head) throw new Error('Cannot combine an empty PDF packet')
 
   // Make sure we combine the documents from left to right and preserve order
