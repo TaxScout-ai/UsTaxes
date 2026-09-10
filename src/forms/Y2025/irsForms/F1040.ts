@@ -137,7 +137,7 @@ export default class F1040 extends F1040Base {
   f8962?: F8962
   f8995?: F8995 | F8995A
   schedule1A?: Schedule1A
-  qualifiedAndCapGainsWorksheet?: SDQualifiedAndCapGains
+  readonly qualifiedAndCapGainsWorksheet: SDQualifiedAndCapGains
   studentLoanInterestWorksheet?: StudentLoanInterestWorksheet
   socialSecurityBenefitsWorksheet?: SocialSecurityBenefitsWorksheet
 
@@ -146,6 +146,8 @@ export default class F1040 extends F1040Base {
   constructor(info: ValidatedInformation, assets: Asset<Date>[]) {
     super(info)
     this.assets = assets
+    // Form 6251 must see the same worksheet even before 1040 line 16 is read.
+    this.qualifiedAndCapGainsWorksheet = new SDQualifiedAndCapGains(this)
     this.qualifyingDependents = new QualifyingDependents(this)
 
     this.scheduleA = new ScheduleA(this)
@@ -703,7 +705,6 @@ export default class F1040 extends F1040Base {
       this.scheduleD.computeTaxOnQDWorksheet() ||
       this.totalQualifiedDividends() > 0
     ) {
-      this.qualifiedAndCapGainsWorksheet = new SDQualifiedAndCapGains(this)
       return this.qualifiedAndCapGainsWorksheet.tax()
     }
 

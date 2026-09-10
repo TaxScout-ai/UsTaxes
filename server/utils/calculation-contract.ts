@@ -58,13 +58,15 @@ export function validateCalculationRequest(raw: unknown): ContractIssue[] {
   if (
     raw.taxYear !== 'Y2025' &&
     (normalized.scheduleH !== undefined ||
+      (object(normalized.form8801) &&
+        normalized.form8801.priorYear !== undefined) ||
       (object(normalized.form5695) &&
         normalized.form5695.details !== undefined))
   )
     issue(
       '/taxYear',
       'unsupported',
-      'Schedule H and detailed Form 5695 are implemented for TY2025 only'
+      'Schedule H, detailed Form 5695 and source-based Form 8801 are implemented for TY2025 only'
     )
   if (!validateInformation(normalized)) {
     for (const e of validateInformation.errors ?? [])

@@ -1,0 +1,30 @@
+[
+  {
+    "path": "public/forms/Y2025/irs/f8801.pdf",
+    "url": "https://www.irs.gov/pub/irs-pdf/f8801.pdf",
+    "sha256": "b82dff67ecf37406bab02f177c706295bd6084853a9ba8be5c87a35c74668a78",
+    "bytes": 104996,
+    "taxYear": 2025
+  },
+  {
+    "path": "public/forms/Y2025/irs/f6251.pdf",
+    "url": "https://www.irs.gov/pub/irs-pdf/f6251.pdf",
+    "sha256": "6995bfd29c6fe1b80fdc396c9c4796c7cef58a966070db0346721eae815fea3f",
+    "bytes": 104434,
+    "taxYear": 2025
+  },
+  {
+    "path": "scripts/verification/authority/i8801-2025.pdf",
+    "url": "https://www.irs.gov/pub/irs-pdf/i8801.pdf",
+    "sha256": "cf99d034d0332110613c8b61b5d3be046fefb638c85ade7e8046b3d79a8ab2ff",
+    "bytes": 173527,
+    "taxYear": 2025
+  },
+  {
+    "path": "scripts/verification/authority/i6251-2025.pdf",
+    "url": "https://www.irs.gov/pub/irs-pdf/i6251.pdf",
+    "sha256": "b130e87362006177794ac29affd2637652cc4c8c03e54227891e2d1b9c976753",
+    "bytes": 254231,
+    "taxYear": 2025
+  }
+]

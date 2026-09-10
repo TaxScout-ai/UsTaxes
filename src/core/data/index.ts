@@ -1248,12 +1248,63 @@ export interface Schedule1AData {
 }
 
 // --- Form 8801 (Credit for Prior Year Minimum Tax) ---
+export type PriorMinimumTaxCapitalGains =
+  | { method: 'ordinary' }
+  | {
+      method: 'qualified_dividends'
+      // Prepared 2024 QDCG worksheet lines 2, 3 (nonnegative), and 5.
+      qualifiedDividends: number
+      netCapitalGain: number
+      ordinaryIncome: number
+    }
+  | {
+      method: 'schedule_d'
+      // Prepared 2024 Schedule D Tax Worksheet lines 13, 10, 14 and 21,
+      // plus Schedule D line 19. These are source worksheet facts, not tax overrides.
+      preferentialGain: number
+      netCapitalGain: number
+      ordinaryIncome: number
+      ordinaryIncomeFor20PercentLimit: number
+      unrecaptured1250Gain: number
+      // When Form 2555 produces an AMT capital gain excess, the modified
+      // prior-year worksheet (including its section 1250 refigure) is required.
+      foreignAMTRefigure?: {
+        gainExcess: number
+        preferentialGain: number
+        netCapitalGain: number
+        unrecaptured1250Gain: number
+        worksheetReference: string
+      }
+    }
+
+export interface Form8801PriorYear {
+  taxYear: 2024
+  filingStatus: FilingStatus
+  returnType: '1040' | '1040-SR' | '1040-NR'
+  form6251: { line1: number; line2e: number; line10: number; line11: number }
+  form8801Line26: number
+  unallowedQualifiedElectricVehicleCredit: number
+  netUSRealPropertyGain: number
+  capitalGains: PriorMinimumTaxCapitalGains
+  foreignEarnedIncome: {
+    applicable: boolean
+    form2555Lines45And50: number
+    relatedDisallowedDeductions: number
+  }
+  foreignTaxCreditOnExclusions:
+    | { method: 'none'; amount: 0 }
+    | { method: 'election_without_1116'; amount: number }
+    | { method: 'prepared_mtftce'; amount: number; worksheetReference: string }
+}
+
 export interface Form8801Data {
-  // Prior year Form 6251 amounts
-  priorYearAMTI: number // Line 1: Prior year AMTI (Form 6251 line 1 + 2e combined)
+  // Legacy aggregates retained for other tax years. TY2025 requires priorYear
+  // and reconciles these values exactly to its actual source-form lines.
+  priorYear?: Form8801PriorYear
+  priorYearAMTI: number // Misnamed legacy field: Form 6251 line 1 + 2e, NOT its AMTI line 4.
   exclusionItems: number // Line 2: Adjustments treated as exclusion items
   mtcNOLDeduction?: number // Line 3: Minimum tax credit NOL deduction
-  // Line 10: Prior year regular tax minus credits
+  // Prior-year Form 6251 line 10 -> current Form 8801 line 14.
   priorYearRegularTaxMinusCredits: number
   // AMT credit carryforward from prior year
   priorYearAMTCreditCarryforward?: number
