@@ -59,4 +59,17 @@ describe('browser form downloader', () => {
     expect(spy).not.toHaveBeenCalled()
     spy.mockRestore()
   })
+
+  it.each([
+    '/forms/Y2025/irs/f1040.pdf',
+    '/forms/Y2024/irs/f1040sh.pdf',
+    '/forms/Y2026/irs/f1040s1a.pdf'
+  ])('lets the shape every caller actually builds through: %s', async (ok) => {
+    // YearForms builds `/forms/${year}/${url}`. The guard must not reject it.
+    // fetch itself is not available under jsdom here, so the assertion is that
+    // the refusal is not what comes back.
+    await expect(downloadPDF(ok)).rejects.not.toThrow(
+      /Refusing to fetch a form/
+    )
+  })
 })

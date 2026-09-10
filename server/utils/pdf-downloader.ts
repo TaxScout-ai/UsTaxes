@@ -1,6 +1,6 @@
 import { PDFDocument } from 'pdf-lib'
 import { readFileSync } from 'fs'
-import { join, resolve, sep } from 'path'
+import { join, resolve, relative, isAbsolute } from 'path'
 import { PDFDownloader } from 'ustaxes/core/pdfFiller/pdfHandler'
 import { TaxYear } from 'ustaxes/core/data'
 
@@ -27,7 +27,8 @@ export function createPdfDownloader(taxYear: TaxYear): PDFDownloader {
     // This keeps it that way: a path that climbs out of the year's form
     // directory is refused instead of read, so a future caller that forwards
     // request data here cannot turn it into an arbitrary file read.
-    if (filePath !== root && !filePath.startsWith(root + sep))
+    const within = relative(root, filePath)
+    if (within.startsWith('..') || isAbsolute(within))
       throw new Error(
         `Refusing to read a form outside the ${taxYear} form directory: ${url}`
       )

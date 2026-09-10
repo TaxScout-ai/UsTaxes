@@ -15,11 +15,16 @@ export interface FileDownloader<T> {
 
 export type PDFDownloader = FileDownloader<PDFDocument>
 
+/** The only shape a form request may take: a same-origin path under /forms/. */
+const FORM_URL =
+  /^\/forms\/[A-Za-z0-9][A-Za-z0-9_.-]*(?:\/[A-Za-z0-9][A-Za-z0-9_.-]*)*$/
+
 export const downloadPDF: PDFDownloader = async (url) => {
-  // Callers pass a same-origin path such as `/forms/Y2025/irs/f1040.pdf`.
-  // A URL that names a scheme or a host is refused, so this fetch cannot be
-  // aimed at a remote or link-local address by whatever supplies the path.
-  if (/^[a-z][a-z0-9+.-]*:/i.test(url) || url.startsWith('//'))
+  // Every caller builds `/forms/{year}/...`, so that prefix is the whole set of
+  // permitted requests. Anything else — a scheme, a host, a climb out of the
+  // form directory — is refused, and the fetch below can therefore never be
+  // aimed at a remote or link-local address.
+  if (!FORM_URL.test(url))
     throw new Error(`Refusing to fetch a form from a non-relative URL: ${url}`)
   const download = await fetch(url)
   const buffer = await download.arrayBuffer()
