@@ -46,17 +46,17 @@ export function deserializeInformation(
     // TaxPayer - deserialize date fields
     taxPayer: {
       ...raw.taxPayer,
-      dependents: (raw.taxPayer?.dependents ?? []).map((dep) => ({
+      dependents: (raw.taxPayer.dependents ?? []).map((dep) => ({
         ...dep,
         dateOfBirth: toDate(dep.dateOfBirth) as Date
       })),
-      primaryPerson: raw.taxPayer?.primaryPerson
+      primaryPerson: raw.taxPayer.primaryPerson
         ? {
             ...raw.taxPayer.primaryPerson,
             dateOfBirth: toDate(raw.taxPayer.primaryPerson.dateOfBirth) as Date
           }
         : undefined,
-      spouse: raw.taxPayer?.spouse
+      spouse: raw.taxPayer.spouse
         ? {
             ...raw.taxPayer.spouse,
             dateOfBirth: toDate(raw.taxPayer.spouse.dateOfBirth) as Date

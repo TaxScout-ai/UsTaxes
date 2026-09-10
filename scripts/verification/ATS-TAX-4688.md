@@ -90,3 +90,26 @@ Authority PDF pins are in `authority/ats1-sources.json`; official templates are
 listed in `public/forms/Y2025/template-sources.json`. Existing Tax Table goldens,
 Schedule 1-A HTTP cases and the canonical 1,018-case benchmark remain regression
 checks. Agreement percentages describe those cases only, never the whole engine.
+
+## Additional regressions exposed by strict PDF verification
+
+Schedule A line 16's description and amount occupy different fields. Its total
+is `f1_30`, and line 18 is an election checkbox, not a dollar field. Both named
+and positional output now preserve these distinctions. The election is not
+inferred from having larger itemized deductions. This fixes PDF binding; it does
+not certify legacy itemized-deduction qualification or SALT MAGI computation.
+
+A field-name index removes repeated AcroForm decoding without weakening unique
+name/type validation. `pdf-fill-performance.ts <new-output.json>` measures the
+fill operation on 25 instances after five warmups, excluding load/save time.
+The local before/after measurement was 152.1 ms versus 2.18 ms; this is not a claim
+about full request latency. Both ambiguous-name and incorrect-type tests remain.
+The FICA property still runs all 100 generated returns; its own deadline is 120
+seconds to avoid the observed 10-second timeout under four-worker test load.
+
+The legacy Form 8801 was separately found to recurse through its own Schedule 3
+credit. Its prior-year input/line model also differs from the official 2025 form;
+removing only the recursion would not establish correctness. This unverified path
+is tracked in TAX-4702, remains outside canonical admission and is not used in
+these eight rehearsals. See https://www.irs.gov/instructions/i8801, line 22, and
+https://www.irs.gov/pub/irs-pdf/f8801.pdf before implementing that separate slice.

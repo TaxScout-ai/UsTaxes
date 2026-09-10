@@ -20,17 +20,38 @@ export function fillPDFByName(
   formName: string
 ): PDFDocument {
   const allFields = pdf.getForm().getFields()
+  // Decoding hierarchical PDF names is expensive. Index once per document,
+  // preserving all candidates so duplicate leaf names still fail explicitly.
+  const exactIndex = new Map<string, typeof allFields>()
+  const suffixIndex = new Map<string, typeof allFields>()
+  const add = (
+    index: Map<string, typeof allFields>,
+    key: string,
+    field: (typeof allFields)[number]
+  ) => {
+    const existing = index.get(key)
+    if (existing) existing.push(field)
+    else index.set(key, [field])
+  }
+  for (const field of allFields) {
+    const name = field.getName()
+    add(exactIndex, name, field)
+    const aliases = new Set<string>()
+    for (
+      let dot = name.indexOf('.');
+      dot !== -1;
+      dot = name.indexOf('.', dot + 1)
+    ) {
+      const suffix = name.slice(dot + 1)
+      aliases.add(suffix)
+      if (suffix.endsWith('[0]')) aliases.add(suffix.slice(0, -3))
+    }
+    for (const alias of aliases) add(suffixIndex, alias, field)
+  }
   for (const [fieldName, value] of Object.entries(namedValues)) {
     if (value === undefined || value === null) continue
-    const exact = allFields.filter((f) => f.getName() === fieldName)
     const matches =
-      exact.length > 0
-        ? exact
-        : allFields.filter(
-            (f) =>
-              f.getName().endsWith(`.${fieldName}[0]`) ||
-              f.getName().endsWith(`.${fieldName}`)
-          )
+      exactIndex.get(fieldName) ?? suffixIndex.get(fieldName) ?? []
     if (matches.length !== 1)
       throw new Error(
         `${formName}: field ${fieldName} resolves to ${matches.length} controls`

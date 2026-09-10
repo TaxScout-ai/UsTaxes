@@ -249,10 +249,10 @@ export const SCHEDULE_A_FIELDS: Record<string, string> = {
   line_13: 'f1_25',
   line_14: 'f1_26',
   line_15: 'f1_27',
-  line_16: 'f1_28',
-  line_17: 'f1_29',
-  line_18: 'f1_30',
-  itemize_check: 'c1_3'
+  line_16_desc: 'f1_28',
+  line_16: 'f1_29',
+  line_17: 'f1_30',
+  line_18: 'c1_3'
 }
 
 // Schedule 2 — Additional Taxes

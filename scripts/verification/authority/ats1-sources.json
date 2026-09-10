@@ -52,5 +52,11 @@
     "url": "https://www.irs.gov/pub/irs-pdf/f5695.pdf",
     "sha256": "e2ac6a5c4b39e9032d3716827992fc0de46289a951e8b1ffaa3d5a969278baf2",
     "bytes": 174928
+  },
+  {
+    "path": "public/forms/Y2025/irs/f1040sa.pdf",
+    "url": "https://www.irs.gov/pub/irs-pdf/f1040sa.pdf",
+    "sha256": "c14acf3478f4c33f27ac6e8ecd9f94b6fb25b16745b341728bd27847d2ef56bb",
+    "bytes": 79008
   }
 ]

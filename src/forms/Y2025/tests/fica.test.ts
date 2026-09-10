@@ -114,7 +114,8 @@ describe('fica', () => {
       }
       return Promise.resolve()
     })
-  })
+    // This property builds 100 full returns; retain every assertion under parallel CI load.
+  }, 120000)
 
   it('should give SS refund based on filing status', async () => {
     await testKit.with1040Assert((forms) => {
