@@ -885,6 +885,82 @@ export interface Form2210Data {
   annualizedIncome?: [number, number, number, number] // income for each period
 }
 
+/** Prepared TY2025 payroll bases, after employee exclusions and annual caps.
+ * This is a Schedule H worksheet contract, not a payroll classification engine.
+ */
+export interface ScheduleHData {
+  employerEin: string
+  wageBasesEstablished: boolean
+  socialSecurityWages: number
+  medicareWages: number
+  additionalMedicareWages: number
+  federalIncomeTaxWithheld: number
+  quarterlyFutaThresholdMet: boolean
+  futa?: {
+    taxableWages: number
+    allWagesSubjectToStateTax: boolean
+    allContributionsPaidByDueDate: boolean
+    states: Array<{
+      state: string
+      taxableWages: number
+      /** Exact rate numerator, denominator 1,000,000; 27,000 means 2.7%. */
+      experienceRatePpm: number
+      periodStart: string
+      periodEnd: string
+      contributionsOnTime: number
+      contributionsLate: number
+      /** FUTA wages also subject to state tax (Worksheet 2, not column b). */
+      futaWagesSubjectToStateTax: number
+    }>
+  }
+}
+
+export interface EnergyPropertyItem {
+  qmid: string
+  cost: number
+}
+
+export interface EnergyHome {
+  street: string
+  unit?: string
+  city: string
+  state: string
+  zip: string
+}
+
+export interface Form5695Details {
+  /** Qualified net costs after business-use, subsidy and labor exclusions. */
+  costsQualifiedFor2025: boolean
+  home: EnergyHome
+  jointOccupancy: boolean
+  condominiumShare: boolean
+  cleanEnergyCarryforward: number
+  batteryAtLeast3Kwh?: boolean
+  fuelCellCapacityKw?: number
+  fuelCellMainHomeInUS?: boolean
+  envelope?: {
+    mainHomeInUS: boolean
+    originalUser: boolean
+    expectedLifeAtLeast5Years: boolean
+    constructionCostsExcluded: boolean
+  }
+  energyProperty?: {
+    homeInUS: boolean
+    originallyPlacedInServiceByTaxpayer: boolean
+  }
+  doors: EnergyPropertyItem[]
+  windows: EnergyPropertyItem[]
+  centralAirConditioners: EnergyPropertyItem[]
+  waterHeaters: EnergyPropertyItem[]
+  furnaces: EnergyPropertyItem[]
+  heatPumps: EnergyPropertyItem[]
+  heatPumpWaterHeaters: EnergyPropertyItem[]
+  biomassStoves: EnergyPropertyItem[]
+  enablingProperty: EnergyPropertyItem[]
+  enablingPropertyCodes?: Array<'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G'>
+  qualifiedHomeEnergyAudit?: boolean
+}
+
 // --- Form 5695 (Residential Energy Credits) ---
 export interface Form5695Data {
   // Part I: Residential Clean Energy Credit (Section 25D)
@@ -906,6 +982,8 @@ export interface Form5695Data {
   panelboards: number // Line 14f — reserved
   homeEnergyAudit: number // Line 15
   priorYearCreditsUsed: number // To track lifetime limits
+  /** TY2025 evidence / item breakdown. Legacy totals must reconcile to items. */
+  details?: Form5695Details
 }
 
 // --- Form 8880 (Saver's Credit) ---
@@ -1209,6 +1287,7 @@ export interface Information<D = Date> {
   form2441?: Form2441Data
   form2210?: Form2210Data
   form5695?: Form5695Data
+  scheduleH?: ScheduleHData
   form8880?: Form8880Data
   form4562s?: Form4562Data[]
   scheduleFData?: ScheduleFData[]

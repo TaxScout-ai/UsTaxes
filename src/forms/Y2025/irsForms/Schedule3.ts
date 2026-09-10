@@ -53,7 +53,10 @@ export default class Schedule3 extends F1040Attachment {
     (this.f1040.f2441?.credit() ?? 0) > 0 ||
     (this.f1040.f8863?.l19() ?? 0) > 0 ||
     (this.f1040.f8880?.credit() ?? 0) > 0 ||
-    (this.f1040.f5695?.credit() ?? 0) > 0
+    (this.f1040.f5695?.credit() ?? 0) > 0 ||
+    (this.f1040.scheduleR?.l22() ?? 0) > 0 ||
+    (this.f1040.f8801?.credit() ?? 0) > 0 ||
+    this.l15() > 0
 
   deductions = (): number => 0
   // Part I: Nonrefundable credits
@@ -64,19 +67,23 @@ export default class Schedule3 extends F1040Attachment {
   l2 = (): number | undefined => this.f1040.f2441?.credit()
   l3 = (): number | undefined => this.f1040.f8863?.l19()
   l4 = (): number | undefined => this.f1040.f8880?.credit()
-  l5 = (): number | undefined => this.f1040.f5695?.credit()
+  l5a = (): number | undefined => this.f1040.f5695?.pdfL15()
+  l5b = (): number | undefined => this.f1040.f5695?.pdfL32()
+  // Compatibility total; PDF and worksheet bindings use 5a and 5b separately.
+  l5 = (): number => sumFields([this.l5a(), this.l5b()])
   l6a = (): number | undefined => undefined // TODO: other credits
-  l6b = (): number | undefined => undefined // TODO: other credits
+  l6b = (): number | undefined => this.f1040.f8801?.credit()
   l6c = (): number | undefined => undefined // TODO: other credits
   l6d = (): number | undefined => this.f1040.scheduleR?.l22()
   l6e = (): number | undefined => undefined // TODO: other credits
   l6f = (): number | undefined => undefined // TODO: other credits
   l6g = (): number | undefined => undefined // TODO: other credits
-  l6h = (): number | undefined => this.f1040.f8801?.credit()
+  l6h = (): number | undefined => undefined // District of Columbia first-time homebuyer
   l6i = (): number | undefined => undefined // TODO: other credits
   l6j = (): number | undefined => undefined // TODO: other credits
   l6k = (): number | undefined => undefined // TODO: other credits
   l6l = (): number | undefined => undefined // TODO: other credits
+  l6m = (): number | undefined => undefined // Previously owned clean vehicles
   l6zDesc1 = (): string | undefined => undefined
   l6zDesc2 = (): string | undefined => undefined
   l6z = (): number | undefined => undefined // TODO: other credits
@@ -95,6 +102,7 @@ export default class Schedule3 extends F1040Attachment {
       this.l6j(),
       this.l6k(),
       this.l6l(),
+      this.l6m(),
       this.l6z()
     ])
 
@@ -167,46 +175,45 @@ export default class Schedule3 extends F1040Attachment {
 
   // Credit for child and dependent care expenses form 2441, line 10
 
-  fields = (): Field[] => [
-    this.f1040.namesString(),
-    this.f1040.info.taxPayer.primaryPerson.ssid,
-    this.l1(),
-    this.l2(),
-    this.l3(),
-    this.l4(),
-    this.l5(),
-    this.l6a(),
-    this.l6b(),
-    this.l6c(),
-    this.l6d(),
-    this.l6e(),
-    this.l6f(),
-    this.l6g(),
-    this.l6h(),
-    this.l6i(),
-    this.l6j(),
-    this.l6k(),
-    this.l6l(),
-    this.l6zDesc1(),
-    this.l6zDesc2(),
-    this.l6z(),
-    this.l7(),
-    this.l8(),
-
-    this.l9(),
-    this.l10(),
-    this.l11(),
-    this.l12(),
-
-    // 2025: consolidated Section 13 — fewer detail fields
-    this.l13a(),                   // [28] f1_29 line 13a
-    this.l13b(),                   // [29] f1_30 line 13b
-    this.l13d(),                   // [30] f1_31 line 13d
-    this.l13f(),                   // [31] f1_32 line 13f
-    this.l13h(),                   // [32] f1_33 line 13h
-    this.l13zDesc1(),              // [33] f1_34 line 13z desc
-    this.l13z(),                   // [34] f1_35 line 13z amount
-    this.l14(),                    // [35] f1_36 line 14
-    this.l15()                     // [36] f1_37 line 15
-  ]
+  namedFields = (): Record<string, Field> => ({
+    f1_01: this.f1040.namesString(),
+    f1_02: this.f1040.info.taxPayer.primaryPerson.ssid,
+    f1_03: this.l1(),
+    f1_04: this.l2(),
+    f1_05: this.l3(),
+    f1_06: this.l4(),
+    f1_07: this.l5a(),
+    f1_08: this.l5b(),
+    f1_09: this.l6a(),
+    f1_10: this.l6b(),
+    f1_11: this.l6c(),
+    f1_12: this.l6d(),
+    f1_13: this.l6e(),
+    f1_14: this.l6f(),
+    f1_15: this.l6g(),
+    f1_16: this.l6h(),
+    f1_17: this.l6i(),
+    f1_18: this.l6j(),
+    f1_19: this.l6k(),
+    f1_20: this.l6l(),
+    f1_21: this.l6m(),
+    f2_22: this.l6zDesc1(),
+    f1_23: this.l6z(),
+    f1_24: this.l7(),
+    f1_25: this.l8(),
+    f1_26: this.l9(),
+    f1_27: this.l10(),
+    f1_28: this.l11(),
+    f1_29: this.l12(),
+    f1_30: this.l13a(),
+    // TY2025 13b repayment credit, 13c elective payment, 13d deferred section 965.
+    f1_31: this.l13d(),
+    f1_32: undefined,
+    f1_33: this.l13f(),
+    f1_34: this.l13zDesc1(),
+    f1_35: this.l13z(),
+    f1_36: this.l14(),
+    f1_37: this.l15()
+  })
+  fields = (): Field[] => Object.values(this.namedFields())
 }

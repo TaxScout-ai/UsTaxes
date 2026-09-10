@@ -29,6 +29,7 @@ import { createStateReturn as createStateReturn2024 } from 'ustaxes/forms/Y2024/
 import { createStateReturn as createStateReturn2025 } from 'ustaxes/forms/Y2025/stateForms'
 import { createStateReturn as createStateReturn2026 } from 'ustaxes/forms/Y2026/stateForms'
 import { PDFDocument } from 'pdf-lib'
+import { statementsPdf } from 'ustaxes/core/pdfFiller/statements'
 import { fillPDF, fillPDFByName } from 'ustaxes/core/pdfFiller/fillPdf'
 import {
   combinePdfs,
@@ -92,16 +93,21 @@ export class YearCreateForm {
               'namedFields' in form &&
               typeof form.namedFields === 'function'
             ) {
-              return fillPDFByName(
+              fillPDFByName(
                 pdf,
                 (
                   form as Form & { namedFields: () => Record<string, Field> }
                 ).namedFields(),
                 form.tag
               )
+            } else {
+              // Legacy: positional array (tolerant mode)
+              fillPDF(pdf, form.renderedFields(), form.tag)
             }
-            // Legacy: positional array (tolerant mode)
-            return fillPDF(pdf, form.renderedFields(), form.tag)
+            const statements = form.supportingStatements()
+            return statements.length === 0
+              ? pdf
+              : combinePdfs([pdf, await statementsPdf(statements)])
           })
       )
     )

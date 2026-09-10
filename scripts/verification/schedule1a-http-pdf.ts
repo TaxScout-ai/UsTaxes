@@ -338,7 +338,7 @@ async function main() {
       })
     }
     // Verify EVERY named field is present in the actual IRS template. This is
-    // essential because the generic filler deliberately ignores unknown names.
+    // a full-map check beyond the generic filler, which now rejects unknown names.
     const sample = requestFor(cases[0])
     const input = {
       ...sample.information,

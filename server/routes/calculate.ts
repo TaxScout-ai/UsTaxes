@@ -19,6 +19,7 @@ import { F1040Error } from 'ustaxes/forms/errors'
 import Form from 'ustaxes/core/irsForms/Form'
 import { validateForm8863Contract } from '../utils/form8863-contract'
 import { Schedule1AInputError } from 'ustaxes/forms/Y2025/irsForms/schedule1AInput'
+import { TaxFormInputError } from 'ustaxes/forms/Y2025/irsForms/formInput'
 
 // Direct imports for each year's create1040 to access the typed F1040
 import { create1040 as create1040For2020 } from 'ustaxes/forms/Y2020/irsForms/Main'
@@ -155,7 +156,10 @@ router.post('/api/calculate', (req: Request, res: Response) => {
 
     res.json(response)
   } catch (err) {
-    if (err instanceof Schedule1AInputError) {
+    if (
+      err instanceof Schedule1AInputError ||
+      err instanceof TaxFormInputError
+    ) {
       res.status(422).json({
         success: false,
         contractVersion: USTAXES_HTTP_CONTRACT_VERSION,

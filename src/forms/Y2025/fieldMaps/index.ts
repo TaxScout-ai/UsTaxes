@@ -27,8 +27,13 @@ export const F1040_FIELDS: Record<string, string> = {
   foreign_province: 'f1_26',
   foreign_postal_code: 'f1_27',
 
-  // Filing Status (radio — c1_5 with select index)
-  filing_status: 'c1_5',
+  // Filing status: five independent c1_8 checkboxes in the TY2025 template
+  filing_status_single:
+    'topmostSubform[0].Page1[0].Checkbox_ReadOrder[0].c1_8[0]',
+  filing_status_mfj: 'topmostSubform[0].Page1[0].Checkbox_ReadOrder[0].c1_8[1]',
+  filing_status_mfs: 'topmostSubform[0].Page1[0].Checkbox_ReadOrder[0].c1_8[2]',
+  filing_status_hoh: 'topmostSubform[0].Page1[0].c1_8[0]',
+  filing_status_qss: 'topmostSubform[0].Page1[0].c1_8[1]',
   mfs_spouse_name: 'f1_28',
   hoh_child_name: 'f1_29',
   nonresident_spouse_name: 'f1_30',
@@ -40,16 +45,20 @@ export const F1040_FIELDS: Record<string, string> = {
   // Dependent checkboxes are handled by the form's _depField methods
 
   // Dependents (4 rows × 4 columns)
-  dep1_name: 'f1_31',
+  dep1_first_name: 'f1_31',
+  dep1_last_name: 'f1_35',
   dep1_ssn: 'f1_39',
   dep1_rel: 'f1_43',
-  dep2_name: 'f1_32',
+  dep2_first_name: 'f1_32',
+  dep2_last_name: 'f1_36',
   dep2_ssn: 'f1_40',
   dep2_rel: 'f1_44',
-  dep3_name: 'f1_33',
+  dep3_first_name: 'f1_33',
+  dep3_last_name: 'f1_37',
   dep3_ssn: 'f1_41',
   dep3_rel: 'f1_45',
-  dep4_name: 'f1_34',
+  dep4_first_name: 'f1_34',
+  dep4_last_name: 'f1_38',
   dep4_ssn: 'f1_42',
   dep4_rel: 'f1_46',
 
@@ -110,7 +119,7 @@ export const F1040_FIELDS: Record<string, string> = {
   line_25d: 'f2_20',
   line_26: 'f2_21',
   line_27a: 'f2_23',
-  line_27c: 'c2_13', // EIC age/residency disqualification checkbox
+  line_27c: 'c2_13', // Election not to claim EIC (not an age test)
   line_28: 'f2_24',
   line_29: 'f2_25',
   line_30: 'f2_26',

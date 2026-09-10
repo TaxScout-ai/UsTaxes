@@ -62,5 +62,13 @@
     "pages": 2,
     "fields": 54,
     "taxYearVerified": 2025
+  },
+  {
+    "tag": "f1040sh",
+    "url": "https://www.irs.gov/pub/irs-pdf/f1040sh.pdf",
+    "sha256": "d04de932bd7d960ba09b3a913cde9bf35c1deec34c5c9b51cdff8c0b1bfdf83a",
+    "pages": 2,
+    "fields": 72,
+    "taxYearVerified": 2025
   }
 ]

@@ -1,4 +1,5 @@
 import F1040Attachment from './F1040Attachment'
+import { rateToWholeDollars, roundLine, sumToWholeDollars } from './rounding'
 import { CreditType, Dependent, FilingStatus } from 'ustaxes/core/data'
 import { sumFields } from 'ustaxes/core/irsForms/util'
 import { FormTag } from 'ustaxes/core/irsForms/Form'
@@ -61,7 +62,7 @@ export default class Schedule8812 extends F1040Attachment {
 
   l4 = (): number => this.creditDependents().length
 
-  l5 = (): number => this.l4() * 2000
+  l5 = (): number => this.l4() * 2200
 
   // TODO: Verify:
   // Number of other dependents, including any qualifying children, who are not under age 18 or who do not have the required SSN. Do not include yourself, your spouse,
@@ -93,32 +94,101 @@ export default class Schedule8812 extends F1040Attachment {
   // TODO: Assuming that people do right now
   l15 = (): boolean => true
 
-  creditLimitWorksheetB = (): number | undefined => undefined
+  usesCreditLimitWorksheetB = (): boolean =>
+    this.l4() > 0 &&
+    this.f1040.f2555 === undefined &&
+    ((this.f1040.f5695?.pdfL13() ?? 0) > 0 ||
+      (this.f1040.schedule3.l6c() ?? 0) > 0 ||
+      (this.f1040.schedule3.l6g() ?? 0) > 0 ||
+      (this.f1040.schedule3.l6h() ?? 0) > 0)
+
+  /** Independent of the Part I energy credit: breaks the apparent worksheet
+   * cycle in the order required by i1040s8, Worksheet B lines 1-14. */
+  creditLimitWorksheetBLine14 = (): number => {
+    const earned = Math.max(0, roundLine(this.earnedIncomeWorksheet()) - 2500)
+    const l5 = rateToWholeDollars(earned, 15, 100, 'Schedule 8812 Worksheet B')
+    let l11 = 0
+    if (this.l4() >= 3 && l5 < this.l12()) {
+      const l7 = this.socialTaxesForCredit()
+      const l8 = roundLine(
+        sumFields([
+          this.f1040.schedule1.l15(),
+          this.f1040.schedule2.l5(),
+          this.f1040.schedule2.l6(),
+          this.f1040.schedule2.l13()
+        ])
+      )
+      l11 = Math.max(
+        0,
+        l7 +
+          l8 -
+          roundLine(sumFields([this.f1040.l27(), this.f1040.schedule3.l11()]))
+      )
+    }
+    return Math.max(
+      0,
+      this.l12() - Math.min(this.l4() * 1700, Math.max(l5, l11))
+    )
+  }
+
+  creditLimitWorksheetB = (): number =>
+    this.usesCreditLimitWorksheetB()
+      ? roundLine(
+          sumFields([
+            this.f1040.schedule3.l5a(),
+            this.f1040.schedule3.l6c(),
+            this.f1040.schedule3.l6g(),
+            this.f1040.schedule3.l6h()
+          ])
+        )
+      : 0
 
   creditLimitWorksheetA = (): number => {
-    const wsl1 = this.f1040.l18()
-    const schedule3Fields = this.f1040.schedule3.isNeeded()
-      ? [
-          this.f1040.schedule3.l1(),
-          this.f1040.schedule3.l2(),
-          this.f1040.schedule3.l3(),
-          this.f1040.schedule3.l4(),
-          this.f1040.schedule3.l5(),
-          this.f1040.schedule3.l6l()
-        ]
-      : []
+    const s = this.f1040.schedule3
+    // 5b only; never include 5a here or deduct Form 5695 a second time.
+    const prior = roundLine(
+      sumFields([
+        s.l1(),
+        s.l2(),
+        s.l3(),
+        s.l4(),
+        s.l5b(),
+        s.l6d(),
+        s.l6f(),
+        s.l6l(),
+        s.l6m()
+      ])
+    )
+    return Math.max(
+      0,
+      roundLine(this.f1040.l18()) - prior - this.creditLimitWorksheetB()
+    )
+  }
 
-    const wsl2 = sumFields([
-      ...schedule3Fields,
-      this.f1040.f5695?.l30(),
-      this.f1040.f8936?.l15(),
-      this.f1040.f8936?.l23(),
-      this.f1040.scheduleR?.l22()
-    ])
-    const wsl3 = Math.max(0, wsl1 - wsl2)
-    const wsl4 = this.creditLimitWorksheetB() ?? 0
-    const wsl5 = Math.max(0, wsl3 - wsl4)
-    return wsl5
+  private socialTaxesForCredit = (): number => {
+    const wages = this.f1040.validW2s()
+    // Separate worksheet lines 1 and 2: aggregate each W-2 box, then round.
+    const withheld =
+      sumToWholeDollars(
+        wages.map((w) => w.ssWithholding),
+        '8812 social taxes worksheet line 1'
+      ) +
+      sumToWholeDollars(
+        wages.map((w) => w.medicareWithholding),
+        '8812 social taxes worksheet line 2'
+      )
+    const f = this.f1040.f8959
+    return (
+      withheld +
+      roundLine(f.l7() ?? 0) -
+      roundLine(f.l22() ?? 0) +
+      rateToWholeDollars(
+        f.l13() ?? 0,
+        1,
+        2,
+        '8812 social taxes worksheet line 7'
+      )
+    )
   }
 
   // TODO: Letter 6419 advance child tax credit payments
@@ -134,8 +204,10 @@ export default class Schedule8812 extends F1040Attachment {
   earnedIncomeWorksheet = (): number => {
     const l1a = this.f1040.l1z()
     const l1b = this.f1040.nonTaxableCombatPay()
-    const l2a = this.f1040.scheduleC?.l1() ?? 0
-    const l2b = this.f1040.scheduleC?.l31() ?? 0
+    // The current Schedule C model represents nonstatutory businesses.
+    // Its gross receipts are not additional statutory-employee earnings.
+    const l2a = 0
+    const l2b = this.f1040.scheduleCNetProfit()
     // Net farm profit (Schedule F)
     const l2c = this.f1040.scheduleFNetProfit()
     // Farm optional method for self-employment net earnings
@@ -180,16 +252,21 @@ export default class Schedule8812 extends F1040Attachment {
     const l17 = Math.min(l16a, l16b)
     const l18a = this.earnedIncomeWorksheet()
     const l18b = this.f1040.nonTaxableCombatPay() ?? 0
-    const l19No = l18a > 2500
-    const l19Yes = l18a <= 2500
+    const l19No = l18a <= 2500
+    const l19Yes = l18a > 2500
     const l19 = Math.max(0, l18a - 2500)
-    const l20 = l19 * 0.15
-    const l20No = l16b >= 4800
-    const l20Yes = l16b < 4800
+    const l20 = rateToWholeDollars(
+      roundLine(l19),
+      15,
+      100,
+      'Schedule 8812 line 20'
+    )
+    const l20No = l16b < 5100
+    const l20Yes = l16b >= 5100
 
     // TODO: check for Puerto Rico residency
     const toLine27 = (() => {
-      if (l20No && l20 > 0) {
+      if (l20No) {
         return Math.min(l17, l20)
       } else if (l20Yes && l20 >= l17) {
         return l17
@@ -217,19 +294,11 @@ export default class Schedule8812 extends F1040Attachment {
   part2b = (): Part2b => {
     const part2a = this.part2a()
     // three or more qualifying children.
-    const allowed = part2a.allowed
+    const allowed = part2a.allowed && (part2a.l16b ?? 0) >= 5100
 
     if (!allowed) return { allowed: false }
 
-    const ssWithholding = this.f1040
-      .validW2s()
-      .reduce((res, w2) => res + w2.ssWithholding, 0)
-
-    const medicareWithholding = this.f1040
-      .validW2s()
-      .reduce((res, w2) => res + w2.medicareWithholding, 0)
-
-    const l21 = ssWithholding + medicareWithholding
+    const l21 = this.socialTaxesForCredit()
 
     const l22 = sumFields([
       this.f1040.schedule1.l15(),
@@ -261,54 +330,68 @@ export default class Schedule8812 extends F1040Attachment {
   }
 
   l27 = (): number | undefined =>
-    this.l12no() ? 0 : this.part2a().toLine27 ?? this.part2b().toLine27
+    this.l12no() || this.f1040.f2555 !== undefined
+      ? 0
+      : this.part2a().toLine27 ?? this.part2b().toLine27
 
-  fields = (): Field[] => {
-    const part2a = this.part2a()
-    const part2b = this.part2b()
-
-    return [
-      this.f1040.namesString(),
-      this.f1040.info.taxPayer.primaryPerson.ssid,
-      this.l1(),
-      this.l2a(),
-      this.l2b(),
-      this.l2c(),
-      this.l2d(),
-      this.l3(),
-      this.l4(),
-      this.l5(),
-      this.l6(),
-      this.l7(),
-      this.l8(),
-      this.l9(),
-      this.l10(),
-      this.l11(),
-      this.l12(),
-      this.l12no(),
-      this.l12yes(),
-      this.l13(),
-      this.l14(),
-      this.l15(),
-      part2a.l16a,
-      part2a.l16bdeps,
-      part2a.l16b,
-      part2a.l17,
-      part2a.l18a,
-      part2a.l18b,
-      part2a.l19No,
-      part2a.l19Yes,
-      part2a.l19,
-      part2a.l20,
-      part2a.l20No,
-      part2a.l20Yes,
-      part2b.l21,
-      part2b.l22,
-      part2b.l23,
-      part2b.l24,
-      part2b.l25,
-      part2b.l26,
-      this.l27()
-    ]
+  namedFields = (): Record<string, Field> => {
+    const a = this.part2a()
+    const b = this.part2b()
+    const fields: Record<string, Field> = {
+      f1_1: this.f1040.namesString(),
+      f1_2: this.f1040.info.taxPayer.primaryPerson.ssid,
+      f1_3: this.l1(),
+      f1_4: this.l2a(),
+      f1_5: this.l2b(),
+      f1_6: this.l2c(),
+      f1_7: this.l2d(),
+      f1_8: this.l3(),
+      f1_9: this.l4(),
+      f1_10: this.l5(),
+      f1_11: this.l6(),
+      f1_12: this.l7(),
+      f1_13: this.l8(),
+      f1_14: this.l9(),
+      f1_15: this.l10(),
+      f1_16: this.l11(),
+      f1_17: this.l12(),
+      'c1_1[0]': this.l12no(),
+      'c1_1[1]': this.l12yes(),
+      f1_18: this.l13(),
+      f1_19: this.l14()
+    }
+    if (
+      this.l12() > this.l14() &&
+      this.l4() > 0 &&
+      this.f1040.f2555 === undefined
+    ) {
+      Object.assign(fields, {
+        // Line 15 is reserved; it is not a checkbox in TY2025.
+        f2_2: a.l16a,
+        f2_3: a.l16bdeps,
+        f2_4: a.l16b,
+        f2_5: a.l17,
+        f2_6: a.l18a,
+        f2_7: a.l18b,
+        'c2_1[0]': a.l19No,
+        'c2_1[1]': a.l19Yes,
+        f2_8: a.l19Yes ? a.l19 : undefined,
+        f2_9: a.l20,
+        'c2_2[0]': a.l20No,
+        'c2_2[1]': a.l20Yes,
+        f2_16: this.l27()
+      })
+      if (a.toLine27 === undefined)
+        Object.assign(fields, {
+          f2_10: b.l21,
+          f2_11: b.l22,
+          f2_12: b.l23,
+          f2_13: b.l24,
+          f2_14: b.l25,
+          f2_15: b.l26
+        })
+    }
+    return fields
   }
+  fields = (): Field[] => Object.values(this.namedFields())
 }

@@ -12,6 +12,7 @@ import { F1040_FIELDS } from '../fieldMaps'
 import { seniorAtDeath, seniorAtYearEnd } from './schedule1AInput'
 import F4972 from './F4972'
 import F5695 from './F5695'
+import ScheduleH from './ScheduleH'
 import F8814 from './F8814'
 import F8888 from './F8888'
 import F8889 from './F8889'
@@ -107,6 +108,7 @@ export default class F1040 extends F1040Base {
   f4952?: F4952
   f4972?: F4972
   f5695?: F5695
+  scheduleH?: ScheduleH
   f6251: F6251
   f8606?: F8606
   _f8606List?: F8606[]
@@ -240,6 +242,9 @@ export default class F1040 extends F1040Base {
     // Create Form 5695 if residential energy credit data exists
     if (this.info.form5695 !== undefined) {
       this.f5695 = new F5695(this, this.info.form5695)
+    }
+    if (this.info.scheduleH !== undefined) {
+      this.scheduleH = new ScheduleH(this, this.info.scheduleH)
     }
 
     // Create Form 4137 for unreported tip income
@@ -435,6 +440,7 @@ export default class F1040 extends F1040Base {
       this.f4952,
       this.f4972,
       this.f5695,
+      this.scheduleH,
       this.f6251,
       this.f8582,
       this.f8814,
@@ -945,7 +951,7 @@ export default class F1040 extends F1040Base {
     set('state', this.info.taxPayer.primaryPerson.address.state)
     set('zip', this.info.taxPayer.primaryPerson.address.zip)
 
-    // Filing status (radio select)
+    // TY2025 uses separate checkboxes, not a radio widget group.
     const fsMap: Record<FilingStatus, number> = {
       [FilingStatus.S]: 0,
       [FilingStatus.MFJ]: 1,
@@ -954,7 +960,9 @@ export default class F1040 extends F1040Base {
       [FilingStatus.W]: 4
     }
     const fsIdx = fsMap[this.info.taxPayer.filingStatus]
-    vals[fm.filing_status] = { select: fsIdx }
+    ;['single', 'mfj', 'mfs', 'hoh', 'qss'].forEach((key, i) =>
+      set(`filing_status_${key}`, fsIdx === i)
+    )
     if (this.info.taxPayer.filingStatus === FilingStatus.MFS) {
       set('mfs_spouse_name', this.spouseFullName())
     }
@@ -963,7 +971,8 @@ export default class F1040 extends F1040Base {
     const deps = this.info.taxPayer.dependents
     for (let i = 0; i < Math.min(deps.length, 4); i++) {
       const dep = deps[i]
-      set(`dep${i + 1}_name`, `${dep.firstName} ${dep.lastName}`)
+      set(`dep${i + 1}_first_name`, dep.firstName)
+      set(`dep${i + 1}_last_name`, dep.lastName)
       set(`dep${i + 1}_ssn`, dep.ssid)
       set(`dep${i + 1}_rel`, dep.relationship)
     }
@@ -1028,10 +1037,9 @@ export default class F1040 extends F1040Base {
     set('line_25d', this.l25d())
     set('line_26', this.l26())
     set('line_27a', this.l27())
-    set(
-      'line_27c',
-      !this.scheduleEIC.atLeastOneChild() && !this.scheduleEIC.over25Under65()
-    )
+    // TY2025 line 27c is an election NOT to claim EIC, not an age test.
+    // The current input has no opt-out election; do not infer one from age.
+    set('line_27c', false)
     set('line_28', this.l28())
     set('line_29', this.l29())
     set('line_31', this.l31())

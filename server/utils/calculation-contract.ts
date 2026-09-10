@@ -55,6 +55,17 @@ export function validateCalculationRequest(raw: unknown): ContractIssue[] {
     ]
   // Empty arrays are the documented optional HTTP defaults. Explicit null is invalid.
   const normalized = normalizeInformation(raw.information)
+  if (
+    raw.taxYear !== 'Y2025' &&
+    (normalized.scheduleH !== undefined ||
+      (object(normalized.form5695) &&
+        normalized.form5695.details !== undefined))
+  )
+    issue(
+      '/taxYear',
+      'unsupported',
+      'Schedule H and detailed Form 5695 are implemented for TY2025 only'
+    )
   if (!validateInformation(normalized)) {
     for (const e of validateInformation.errors ?? [])
       issue(
@@ -78,7 +89,9 @@ export function validateCalculationRequest(raw: unknown): ContractIssue[] {
     }
     if (!object(value)) return
     for (const [key, v] of Object.entries(value)) {
-      if (/Date$|dateOfBirth/.test(key) && v !== undefined) {
+      // Shape validation above establishes field types. A boolean whose name
+      // ends in Date (for example allContributionsPaidByDueDate) is not a date.
+      if (/Date$|dateOfBirth/.test(key) && typeof v === 'string') {
         if (
           typeof v !== 'string' ||
           !/^\d{4}-\d{2}-\d{2}(T.*)?$/.test(v) ||
