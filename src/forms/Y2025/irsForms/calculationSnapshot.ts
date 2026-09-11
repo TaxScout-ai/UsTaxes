@@ -376,6 +376,37 @@ export function calculationSnapshot(f: F1040) {
               '31': f.scheduleC.l31()
             } as Lines
           },
+    f8995:
+      f.f8995?.tag !== 'f8995'
+        ? null
+        : {
+            lines: Object.fromEntries(
+              Array.from({ length: 16 }, (_, i) => {
+                const line = i + 2
+                const form = f.f8995
+                if (!form) throw new Error('Missing Form 8995')
+                const methods = [
+                  form.l2,
+                  form.l3,
+                  form.l4,
+                  form.l5,
+                  form.l6,
+                  form.l7,
+                  form.l8,
+                  form.l9,
+                  form.l10,
+                  form.l11,
+                  form.l12,
+                  form.l13,
+                  form.l14,
+                  form.l15,
+                  form.l16,
+                  form.l17
+                ]
+                return [String(line), methods[i]()]
+              })
+            ) as Lines
+          },
     f7206:
       f.f7206s().length === 0
         ? null

@@ -4,6 +4,7 @@ import { FormTag } from 'ustaxes/core/irsForms/Form'
 import { FilingStatus } from 'ustaxes/core/data'
 import { sumFields } from 'ustaxes/core/irsForms/util'
 import { Field } from 'ustaxes/core/pdfFiller'
+import { roundLine, sumToWholeDollars, rateToWholeDollars } from './rounding'
 
 function ifNumber(
   num: number | undefined,
@@ -107,7 +108,13 @@ export default class F8995A extends F8995 {
   l19c = (): number | undefined =>
     ifNumber(this.l17c(), (num) => num - (this.l18c() ?? 0))
 
-  l20 = (): number => this.f1040.l11() - this.f1040.l12()
+  l20 = (): number =>
+    Math.max(
+      0,
+      roundLine(this.f1040.l11()) -
+        roundLine(this.f1040.l12()) -
+        roundLine(this.f1040.l13b() ?? 0)
+    )
   l21 = (): number =>
     getF8995PhaseOutIncome(this.f1040.info.taxPayer.filingStatus)
   l22 = (): number => this.l20() - this.l21()
@@ -131,19 +138,29 @@ export default class F8995A extends F8995 {
 
   l27 = (): number => this.l16()
 
-  // TODO: REIT
-  l28 = (): number => 0
+  // IRS Form 8995-A line 28: REIT/PTP component is separate from ordinary business QBI.
+  l28 = (): number =>
+    sumToWholeDollars(
+      [
+        ...this.f1040.info.scheduleK1Form1065s.flatMap((k) => [
+          k.qualifiedReitDividends ?? 0,
+          k.publiclyTradedPartnershipIncome ?? 0
+        ]),
+        ...this.f1040.f1099Divs().map((d) => d.form.section199ADividends ?? 0)
+      ],
+      'Form8995A:28'
+    )
   l29 = (): number => 0
 
   l30 = (): number => Math.max(0, this.l28() + this.l29())
-  l31 = (): number => this.l30() * 0.2
+  l31 = (): number => rateToWholeDollars(this.l30(), 1, 5, 'Form8995A:31')
 
   l32 = (): number => this.l27() + this.l31()
   l33 = (): number => this.l20()
   l34 = (): number => this.netCapitalGains()
-  l35 = (): number => this.l33() - this.l34()
-  l36 = (): number => this.l35() * 0.2
-  l37 = (): number => Math.min(this.l32(), this.l36())
+  l35 = (): number => Math.max(0, this.l33() - this.l34())
+  l36 = (): number => rateToWholeDollars(this.l35(), 1, 5, 'Form8995A:36')
+  l37 = (): number => roundLine(Math.min(this.l32(), this.l36()))
 
   // TODO: DPAD
   l38 = (): number => 0
