@@ -180,7 +180,7 @@ const federalBrackets: FederalBrackets = {
         brackets: [96700, 600050]
       },
       [FilingStatus.MFS]: {
-        brackets: [48350, 300025]
+        brackets: [48350, 300000]
       },
       [FilingStatus.HOH]: {
         brackets: [64750, 566700]
