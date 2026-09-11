@@ -810,6 +810,17 @@ export interface F4835Data {
   allInvestmentAtRisk: boolean
 }
 
+/** Form 7206: the self-employed health insurance deduction for one business's plan. */
+export interface Form7206Data {
+  personRole: PersonRole.PRIMARY | PersonRole.SPOUSE
+  /** Index into `scheduleCBusinesses` of the business the plan is established under. */
+  scheduleCIndex: number
+  /** Line 1: health insurance premiums paid for the year (net of the exclusions the form lists). */
+  healthInsurancePremiums: number
+  /** Line 2: qualified long-term care premiums, already limited by age. */
+  longTermCarePremiums: number
+}
+
 /** Schedule SE Part II: the taxpayer elects an optional method to figure net earnings. */
 export interface ScheduleSEOptions {
   /** Farm optional method (lines 14–15): allowed when gross farm income is at or below the limit or net farm profit is below it. */
@@ -1402,6 +1413,8 @@ export interface Information<D = Date> {
   f4835s?: F4835Data[]
   /** Schedule SE Part II elections; absent means the regular method. */
   scheduleSEOptions?: ScheduleSEOptions
+  /** Form 7206 per trade or business; Schedule 1 line 17 is their sum (replaces the scalar when present). */
+  form7206s?: Form7206Data[]
   form2555s?: Form2555Data[]
   form8582?: Form8582Data
   form4797?: Form4797Data
