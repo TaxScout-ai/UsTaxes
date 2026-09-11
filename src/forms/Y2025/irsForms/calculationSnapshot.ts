@@ -19,6 +19,10 @@ type Lines = Record<string, number | null>
  * Schedule D, Schedule E, Schedule F, Schedule SE and Form 4835 (the first
  * copy of a form that may repeat). Yes/no lines are 1/0; an unanswered one is
  * `null`.
+ *
+ * v5 adds Schedule C and Form 7206 (first copies), Schedule 1 lines 16/17,
+ * and reports Form 7206 line 6 (a five-decimal ratio) as an integer in
+ * hundred-thousandths so every line stays a whole number.
  */
 const yesNo = (v: boolean | undefined): number | null =>
   v === undefined ? null : v ? 1 : 0
@@ -149,6 +153,8 @@ export function calculationSnapshot(f: F1040) {
             '7': f.schedule1.l7() ?? null,
             '10': f.schedule1.l10(),
             '15': f.schedule1.l15() ?? null,
+            '16': f.schedule1.l16() ?? null,
+            '17': f.schedule1.l17() ?? null,
             '26': f.schedule1.l26()
           } as Lines
         },
@@ -256,6 +262,72 @@ export function calculationSnapshot(f: F1040) {
             '15': f.scheduleSE.l15() ?? null
           } as Lines
         },
+    scheduleC:
+      f.scheduleC === undefined
+        ? null
+        : {
+            lines: {
+              '1': f.scheduleC.l1(),
+              '2': f.scheduleC.l2(),
+              '3': f.scheduleC.l3(),
+              '4': f.scheduleC.l4(),
+              '5': f.scheduleC.l5(),
+              '6': f.scheduleC.l6(),
+              '7': f.scheduleC.l7(),
+              '8': f.scheduleC.l8(),
+              '9': f.scheduleC.l9(),
+              '10': f.scheduleC.l10(),
+              '11': f.scheduleC.l11(),
+              '12': f.scheduleC.l12(),
+              '13': f.scheduleC.l13(),
+              '14': f.scheduleC.l14(),
+              '15': f.scheduleC.l15(),
+              '16a': f.scheduleC.l16a(),
+              '16b': f.scheduleC.l16b(),
+              '17': f.scheduleC.l17(),
+              '18': f.scheduleC.l18(),
+              '19': f.scheduleC.l19(),
+              '20a': f.scheduleC.l20a(),
+              '20b': f.scheduleC.l20b(),
+              '21': f.scheduleC.l21(),
+              '22': f.scheduleC.l22(),
+              '23': f.scheduleC.l23(),
+              '24a': f.scheduleC.l24a(),
+              '24b': f.scheduleC.l24b(),
+              '25': f.scheduleC.l25(),
+              '26': f.scheduleC.l26(),
+              '27a': f.scheduleC.l27a(),
+              '27b': f.scheduleC.l27b(),
+              '28': f.scheduleC.l28(),
+              '29': f.scheduleC.l29(),
+              '30': f.scheduleC.l30(),
+              '31': f.scheduleC.l31()
+            } as Lines
+          },
+    f7206:
+      f.f7206s().length === 0
+        ? null
+        : (() => {
+            const [h] = f.f7206s()
+            return {
+              lines: {
+                '1': h.l1(),
+                '2': h.l2(),
+                '3': h.l3(),
+                '4': h.l4(),
+                '5': h.l5(),
+                '6': Math.round(h.l6() * 100000),
+                '7': h.l7(),
+                '8': h.l8(),
+                '9': h.l9(),
+                '10': h.l10(),
+                '11': h.l11() ?? null,
+                '12': h.l12() ?? null,
+                '13': h.l13(),
+                '14': h.l14()
+              } as Lines
+            }
+          })(),
     f4835:
       f.f4835s().length === 0
         ? null
@@ -380,7 +452,7 @@ export function calculationSnapshot(f: F1040) {
     primaryBlind: f.blind()
   }
   return {
-    schemaVersion: 'ustaxes-1040-line-snapshot-v4',
+    schemaVersion: 'ustaxes-1040-line-snapshot-v5',
     taxYear: 2025,
     form: '1040',
     lines,

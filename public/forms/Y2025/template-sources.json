@@ -86,5 +86,13 @@
     "pages": 3,
     "fields": 63,
     "taxYearVerified": 2025
+  },
+  {
+    "tag": "f7206",
+    "url": "https://www.irs.gov/pub/irs-pdf/f7206.pdf",
+    "sha256": "822203c9bbd958e651e243bbf6353c4c8e78abbde412e06caf6db5f88fe68ee1",
+    "pages": 1,
+    "fields": 16,
+    "taxYearVerified": 2025
   }
 ]
