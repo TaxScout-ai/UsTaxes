@@ -4,6 +4,7 @@ import { FormTag } from 'ustaxes/core/irsForms/Form'
 import { ScheduleFData } from 'ustaxes/core/data'
 import { sumFields } from 'ustaxes/core/irsForms/util'
 import F1040 from './F1040'
+import { roundLine } from './rounding'
 
 /**
  * Schedule F — Profit or Loss from Farming
@@ -11,7 +12,7 @@ import F1040 from './F1040'
  * Reports income and expenses from farming operations.
  * Net profit/loss flows to Schedule 1 line 6.
  *
- * Reference: 2024 Schedule F instructions (46 Excel formulas)
+ * Reference: IRS TY2025 Schedule F and printed PDF line labels
  */
 export default class ScheduleF extends F1040Attachment {
   tag: FormTag = 'f1040sf'
@@ -137,101 +138,166 @@ export default class ScheduleF extends F1040Attachment {
   // Net profit/loss for Schedule 1
   netProfitOrLoss = (): number => this.l34()
 
-  fields = (): Field[] => [
-    // Page 1 — 71 fields (indices 0-70)
-    this.f1040.namesString(),                           // 0: f1_1 name
-    this.f1040.info.taxPayer.primaryPerson.ssid,        // 1: f1_2 SSN
-    this.data.farmName,                                 // 2: f1_3 principal crop/activity (A)
-    this.data.ein ?? '',                                // 3: f1_4 EIN (B)
-    this.data.accountingMethod === 'Cash',              // 4: c1_1[0] Cash method
-    this.data.accountingMethod === 'Accrual',           // 5: c1_1[1] Accrual method
-    undefined,                                          // 6: f1_5 (Line D employer ID)
-    false,                                              // 7: c1_2[0] (Line E/F checkbox)
-    false,                                              // 8: c1_2[1] (Line E/F checkbox)
-    false,                                              // 9: c1_3[0] (checkbox)
-    false,                                              // 10: c1_3[1] (checkbox)
-    false,                                              // 11: c1_4[0] (checkbox)
-    false,                                              // 12: c1_4[1] (checkbox)
-    // Part I: Income
-    this.l1a(),                                         // 13: f1_6 line 1a
-    this.l1b(),                                         // 14: f1_7 line 1b
-    this.l1c(),                                         // 15: f1_8 line 1c
-    this.l2(),                                          // 16: f1_9 line 2
-    this.l3a(),                                         // 17: f1_10 line 3a
-    undefined,                                          // 18: f1_11 line 3b
-    this.l4a(),                                         // 19: f1_12 line 4a
-    undefined,                                          // 20: f1_13 line 4b
-    this.l5a(),                                         // 21: f1_14 line 5a
-    undefined,                                          // 22: f1_15 line 5b/5c
-    this.l6(),                                          // 23: f1_16 line 6a
-    undefined,                                          // 24: f1_17 line 6b amount
-    undefined,                                          // 25: f1_18 line 6c/6d
-    false,                                              // 26: c1_5 line 6b checkbox
-    this.l7(),                                          // 27: f1_19 line 7
-    this.l8(),                                          // 28: f1_20 line 8
-    this.l9(),                                          // 29: f1_21 line 9
-    undefined,                                          // 30: f1_22 (reserved)
-    // Part II: Expenses (lines 10-32)
-    this.l10(),                                         // 31: f1_23 line 10
-    this.l11(),                                         // 32: f1_24 line 11
-    this.l12(),                                         // 33: f1_25 line 12
-    this.l13(),                                         // 34: f1_26 line 13
-    this.l14(),                                         // 35: f1_27 line 14
-    this.l15(),                                         // 36: f1_28 line 15
-    this.l16(),                                         // 37: f1_29 line 16
-    this.l17(),                                         // 38: f1_30 line 17
-    this.l18(),                                         // 39: f1_31 line 18
-    this.l19(),                                         // 40: f1_32 line 19
-    this.l20(),                                         // 41: f1_33 line 20
-    this.l21a(),                                        // 42: f1_34 line 21a
-    this.l21b(),                                        // 43: f1_35 line 21b
-    this.l22(),                                         // 44: f1_36 line 22
-    this.l23(),                                         // 45: f1_37 line 23
-    this.l24a(),                                        // 46: f1_38 line 24a
-    this.l24b(),                                        // 47: f1_39 line 24b
-    this.l25(),                                         // 48: f1_40 line 25
-    this.l26(),                                         // 49: f1_41 line 26
-    this.l27(),                                         // 50: f1_42 line 27
-    this.l28(),                                         // 51: f1_43 line 28
-    this.l29(),                                         // 52: f1_44 line 29
-    this.l30(),                                         // 53: f1_45 line 30
-    this.l31(),                                         // 54: f1_46 line 31
-    this.l32(),                                         // 55: f1_47 line 32 other expenses
-    this.l33(),                                         // 56: f1_48 line 33 total expenses
-    this.l34(),                                         // 57: f1_49 line 34 net profit/loss
-    undefined,                                          // 58: f1_50
-    undefined,                                          // 59: f1_51
-    undefined,                                          // 60: f1_52
-    undefined,                                          // 61: f1_53
-    undefined,                                          // 62: f1_54
-    undefined,                                          // 63: f1_55
-    undefined,                                          // 64: f1_56
-    undefined,                                          // 65: f1_57
-    undefined,                                          // 66: f1_58
-    undefined,                                          // 67: f1_59
-    undefined,                                          // 68: f1_60
-    false,                                              // 69: c1_6[0] (line 36a checkbox)
-    false,                                              // 70: c1_6[1] (line 36b checkbox)
-    // Page 2 — 18 fields (indices 71-88)
-    undefined,                                          // 71: f2_1 line 37
-    undefined,                                          // 72: f2_2 line 38a
-    undefined,                                          // 73: f2_3 line 38b
-    undefined,                                          // 74: f2_4 line 39a
-    undefined,                                          // 75: f2_5 line 39b
-    undefined,                                          // 76: f2_6 line 40a
-    undefined,                                          // 77: f2_7 line 40b
-    undefined,                                          // 78: f2_8 line 41
-    undefined,                                          // 79: f2_9 line 42
-    undefined,                                          // 80: f2_10 line 43
-    undefined,                                          // 81: f2_11 line 44
-    undefined,                                          // 82: f2_12 line 45a
-    undefined,                                          // 83: f2_13 line 45b
-    undefined,                                          // 84: f2_14 line 46
-    undefined,                                          // 85: f2_15
-    undefined,                                          // 86: f2_16
-    undefined,                                          // 87: f2_17
-    undefined                                           // 88: f2_18
-  ]
+  namedFields = (): Record<string, Field> => {
+    const d = this.data
+    const values: Record<string, Field> = {
+      'f1_1[0]': this.f1040.namesString(),
+      'f1_2[0]': this.f1040.info.taxPayer.primaryPerson.ssid,
+      'f1_3[0]': d.farmName,
+      'f1_4[0]': d.activityCode,
+      'f1_5[0]': d.ein,
+      'c1_1[0]': d.accountingMethod === 'Cash',
+      'c1_1[1]': d.accountingMethod === 'Accrual',
+      'c1_2[0]': d.materiallyParticipated === true,
+      'c1_2[1]': d.materiallyParticipated === false,
+      'c1_3[0]': d.paymentsRequiringForms1099 === true,
+      'c1_3[1]': d.paymentsRequiringForms1099 === false,
+      'c1_4[0]':
+        d.paymentsRequiringForms1099 === true && d.forms1099Filed === true,
+      'c1_4[1]':
+        d.paymentsRequiringForms1099 === true && d.forms1099Filed === false,
+      'f1_47[0]': d.otherExpensesDescription,
+      'f1_48[0]': roundLine(this.l32()),
+      'f1_17[0]': roundLine(this.l6()),
+      'f1_18[0]': roundLine(this.l6()),
+      'f1_11[0]': roundLine(this.l3a()),
+      'f1_13[0]': roundLine(this.l4a()),
+      'f1_6[0]': roundLine(this.l1a()),
+      'f1_7[0]': roundLine(this.l1b()),
+      'f1_8[0]': roundLine(this.l1c()),
+      'f1_9[0]': roundLine(this.l2()),
+      'f1_10[0]': roundLine(this.l3a()),
+      'f1_12[0]': roundLine(this.l4a()),
+      'f1_14[0]': roundLine(this.l5a()),
+      'f1_20[0]': roundLine(this.l7()),
+      'f1_21[0]': roundLine(this.l8()),
+      'f1_22[0]': roundLine(this.l9()),
+      'f1_23[0]': roundLine(this.l10()),
+      'f1_24[0]': roundLine(this.l11()),
+      'f1_25[0]': roundLine(this.l12()),
+      'f1_26[0]': roundLine(this.l13()),
+      'f1_27[0]': roundLine(this.l14()),
+      'f1_28[0]': roundLine(this.l15()),
+      'f1_29[0]': roundLine(this.l16()),
+      'f1_30[0]': roundLine(this.l17()),
+      'f1_31[0]': roundLine(this.l18()),
+      'f1_32[0]': roundLine(this.l19()),
+      'f1_33[0]': roundLine(this.l20()),
+      'f1_36[0]': roundLine(this.l22()),
+      'f1_37[0]': roundLine(this.l23()),
+      'f1_40[0]': roundLine(this.l25()),
+      'f1_41[0]': roundLine(this.l26()),
+      'f1_42[0]': roundLine(this.l27()),
+      'f1_43[0]': roundLine(this.l28()),
+      'f1_44[0]': roundLine(this.l29()),
+      'f1_45[0]': roundLine(this.l30()),
+      'f1_46[0]': roundLine(this.l31()),
+      'f1_59[0]': roundLine(this.l33()),
+      'f1_60[0]': roundLine(this.l34()),
+      'f1_34[0]': roundLine(this.l21a()),
+      'f1_35[0]': roundLine(this.l21b()),
+      'f1_38[0]': roundLine(this.l24a()),
+      'f1_39[0]': roundLine(this.l24b())
+    }
+    return values
+  }
+
+  fields = (): Field[] => {
+    const named = this.namedFields()
+    // Official TY2025 widget order; monetary placement is owned by namedFields.
+    const order = [
+      'f1_1[0]',
+      'f1_2[0]',
+      'f1_3[0]',
+      'f1_4[0]',
+      'c1_1[0]',
+      'c1_1[1]',
+      'f1_5[0]',
+      'c1_2[0]',
+      'c1_2[1]',
+      'c1_3[0]',
+      'c1_3[1]',
+      'c1_4[0]',
+      'c1_4[1]',
+      'f1_6[0]',
+      'f1_7[0]',
+      'f1_8[0]',
+      'f1_9[0]',
+      'f1_10[0]',
+      'f1_11[0]',
+      'f1_12[0]',
+      'f1_13[0]',
+      'f1_14[0]',
+      'f1_15[0]',
+      'f1_16[0]',
+      'f1_17[0]',
+      'f1_18[0]',
+      'c1_5[0]',
+      'f1_19[0]',
+      'f1_20[0]',
+      'f1_21[0]',
+      'f1_22[0]',
+      'f1_23[0]',
+      'f1_24[0]',
+      'f1_25[0]',
+      'f1_26[0]',
+      'f1_27[0]',
+      'f1_28[0]',
+      'f1_29[0]',
+      'f1_30[0]',
+      'f1_31[0]',
+      'f1_32[0]',
+      'f1_33[0]',
+      'f1_34[0]',
+      'f1_35[0]',
+      'f1_36[0]',
+      'f1_37[0]',
+      'f1_38[0]',
+      'f1_39[0]',
+      'f1_40[0]',
+      'f1_41[0]',
+      'f1_42[0]',
+      'f1_43[0]',
+      'f1_44[0]',
+      'f1_45[0]',
+      'f1_46[0]',
+      'f1_47[0]',
+      'f1_48[0]',
+      'f1_49[0]',
+      'f1_50[0]',
+      'f1_51[0]',
+      'f1_52[0]',
+      'f1_53[0]',
+      'f1_54[0]',
+      'f1_55[0]',
+      'f1_56[0]',
+      'f1_57[0]',
+      'f1_58[0]',
+      'f1_59[0]',
+      'f1_60[0]',
+      'c1_6[0]',
+      'c1_6[1]',
+      'f2_1[0]',
+      'f2_2[0]',
+      'f2_3[0]',
+      'f2_4[0]',
+      'f2_5[0]',
+      'f2_6[0]',
+      'f2_7[0]',
+      'f2_8[0]',
+      'f2_9[0]',
+      'f2_10[0]',
+      'f2_11[0]',
+      'f2_12[0]',
+      'f2_13[0]',
+      'f2_14[0]',
+      'f2_15[0]',
+      'f2_16[0]',
+      'f2_17[0]',
+      'f2_18[0]'
+    ]
+    return order.map((name) => named[name])
+  }
 
   copies = (): ScheduleF[] => {
     const list = this.f1040._scheduleFList ?? []

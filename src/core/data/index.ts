@@ -1114,6 +1114,11 @@ export interface Form8880Data {
 // --- Schedule F (Profit or Loss from Farming) ---
 export interface ScheduleFData {
   farmName: string
+  activityCode?: string
+  materiallyParticipated?: boolean
+  paymentsRequiringForms1099?: boolean
+  forms1099Filed?: boolean
+  otherExpensesDescription?: string
   ein?: string
   accountingMethod: 'Cash' | 'Accrual'
   personRole: PersonRole.PRIMARY | PersonRole.SPOUSE
