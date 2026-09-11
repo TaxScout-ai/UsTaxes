@@ -66,6 +66,12 @@ export const questions: Question[] = [
     `Do you elect not to claim the earned income credit (Form 1040 line 27c)?`,
     'boolean',
     () => true
+  ),
+  q(
+    'DECLINE_ACTC',
+    `Do you elect not to claim the additional child tax credit (Form 1040 line 28)?`,
+    'boolean',
+    () => true
   )
 ]
 

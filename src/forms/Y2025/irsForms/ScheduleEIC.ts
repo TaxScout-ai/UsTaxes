@@ -9,7 +9,6 @@ import F4797 from './F4797'
 import F8814 from './F8814'
 import Pub596Worksheet1 from './worksheets/Pub596Worksheet1'
 import { FormTag } from 'ustaxes/core/irsForms/Form'
-import { evaluatePiecewise, Piecewise } from 'ustaxes/core/util'
 import _ from 'lodash'
 import { Field } from 'ustaxes/core/pdfFiller'
 
@@ -223,58 +222,18 @@ export default class ScheduleEIC extends F1040Attachment {
   }
 
   /**
-   * The credit table in Publication 596 provides an
-   * amount for each interval of $50, calculated from the
-   * midpoint of the interval.
-   *
-   * @param income The earned income
-   * @returns the earned income rounded to the nearest 25
-   */
-  roundIncome = (income: number): number => {
-    if (income < 1) {
-      return 0
-    }
-    return Math.round(Math.round(income) / 50) * 50 + 25
-  }
-
-  /**
-   * Based on the earned income and filing status, calculate the
-   * allowed EITC.
-   *
-   * For tax year 2020, IRS Rev. Proc. 2019-44 outlines the required
-   * calculation for the EITC based on number of qualifying children
-   * and filing status.
-   *
-   * https://www.irs.gov/pub/irs-drop/rp-19-44.pdf
-   *
-   * IRS publication 596 provides a table that can be used
-   * to figure the EITC, and is the basis of online calculators published
-   * by IRS. This table uses the formulas outlined in Rev Proc 2019-44
-   * but applies them to incomes lying in $50 intervals, with the midpoint
-   * of those intervals used to calculate the credit for the entire window.
-   * For example, if the taxpayer has an earned income of $5000, the amount
-   * that is found in the table is calculated based on an income of $5025 and
-   * comes out ahead. Conversely, someone with an earned income of $5049 finds
-   * a credit in the table calculated off the same $5,025 and loses out.
-   *
-   * https://www.irs.gov/pub/irs-pdf/p596.pdf
-   *
-   * @param income The earned income
-   * @returns
+   * The EIC Table amount (2025 Instructions for Form 1040) for the $50 band
+   * containing the income: figured at the band midpoint from the Rev. Proc.
+   * 2024-40 parameters, rounded to the dollar, the plateau-straddling bands
+   * carrying the maximum. See federal.eicTableCredit.
    */
   calculateEICForIncome = (income: number): number => {
     const filingStatus = this.f1040.info.taxPayer.filingStatus
-    const f: Piecewise[] | undefined = federal.EIC.formulas[filingStatus]
-    if (f === undefined) {
-      return 0
-    }
-
-    return Math.max(
-      0,
-      evaluatePiecewise(
-        f[this.qualifyingDependents().length],
-        this.roundIncome(income)
-      )
+    if (federal.EIC.formulas[filingStatus] === undefined) return 0
+    return federal.eicTableCredit(
+      income,
+      this.qualifyingDependents().length,
+      filingStatus === FilingStatus.MFJ
     )
   }
 
@@ -288,12 +247,34 @@ export default class ScheduleEIC extends F1040Attachment {
 
   // 6.1 - We will figure the credit.
 
-  // EIC worksheet A calculation
-  credit = (): number =>
-    Math.min(
-      this.calculateEICForIncome(this.earnedIncome()),
+  /**
+   * EIC Worksheet A: the credit on earned income (line 2), and — only when
+   * AGI reaches the phase-out threshold for the filing status and number of
+   * children (line 3) — the smaller of that and the credit on AGI (line 5).
+   * Below the threshold the AGI lookup is not made.
+   */
+  agiLookupThreshold = (): number => {
+    const p =
+      federal.eicParameters[
+        Math.min(
+          this.qualifyingDependents().length,
+          federal.eicParameters.length - 1
+        )
+      ]
+    return this.jointReturn() ? p.phaseOutStartMfj : p.phaseOutStart
+  }
+
+  agiLookupRequired = (): boolean =>
+    this.f1040.l11() >= this.agiLookupThreshold()
+
+  credit = (): number => {
+    const onEarnedIncome = this.calculateEICForIncome(this.earnedIncome())
+    if (!this.agiLookupRequired()) return onEarnedIncome
+    return Math.min(
+      onEarnedIncome,
       this.calculateEICForIncome(this.f1040.l11())
     )
+  }
 
   allowed = (): boolean => {
     return (

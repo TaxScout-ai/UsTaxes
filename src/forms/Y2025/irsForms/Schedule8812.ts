@@ -90,9 +90,8 @@ export default class Schedule8812 extends F1040Attachment {
 
   l14 = (): number => (this.l12no() ? 0 : Math.min(this.l12(), this.l13()))
 
-  // Check this box if you do not want to file the additional tax credit
-  // TODO: Assuming that people do right now
-  l15 = (): boolean => true
+  /** Line 15 is reserved on the 2025 schedule; the opt-out is the Form 1040 line 28 box. */
+  actcDeclined = (): boolean => this.f1040.actcDeclined()
 
   usesCreditLimitWorksheetB = (): boolean =>
     this.l4() > 0 &&
@@ -181,7 +180,7 @@ export default class Schedule8812 extends F1040Attachment {
     return (
       withheld +
       roundLine(f.l7() ?? 0) -
-      roundLine(f.l22() ?? 0) +
+      roundLine(f.l22()) +
       rateToWholeDollars(
         f.l13() ?? 0,
         1,
@@ -210,11 +209,9 @@ export default class Schedule8812 extends F1040Attachment {
     const l2b = this.f1040.scheduleCNetProfit()
     // Net farm profit (Schedule F)
     const l2c = this.f1040.scheduleFNetProfit()
-    // Farm optional method for self-employment net earnings
-    const l2d = 0
-
-    // Smaller of l2c or l2d (if farm optional method not used, use l2c directly)
-    const l2e = l2d === 0 ? l2c : Math.min(l2c, l2d)
+    // Farm optional method for self-employment net earnings: not used, so
+    // line 2e is line 2c itself.
+    const l2e = l2c
 
     const l3 = sumFields([l1a, l1b, l2a, l2b, l2e])
 
@@ -330,7 +327,7 @@ export default class Schedule8812 extends F1040Attachment {
   }
 
   l27 = (): number | undefined =>
-    this.l12no() || this.f1040.f2555 !== undefined
+    this.l12no() || this.f1040.f2555 !== undefined || this.actcDeclined()
       ? 0
       : this.part2a().toLine27 ?? this.part2b().toLine27
 

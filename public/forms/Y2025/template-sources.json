@@ -118,5 +118,29 @@
     "pages": 2,
     "fields": 117,
     "taxYearVerified": 2025
+  },
+  {
+    "tag": "f3903",
+    "url": "https://www.irs.gov/pub/irs-pdf/f3903.pdf",
+    "sha256": "54ab871c850d72bad1b86ed76b5decca45550dc7f5141fd76413318ff0132167",
+    "pages": 1,
+    "fields": 10,
+    "taxYearVerified": 2025
+  },
+  {
+    "tag": "f8862",
+    "url": "https://www.irs.gov/pub/irs-pdf/f8862.pdf",
+    "sha256": "fd783d1f46f1f286cd1d7a2cca8812fc2ec05760478359873e22ba9d05d5f3b5",
+    "pages": 3,
+    "fields": 109,
+    "taxYearVerified": 2025
+  },
+  {
+    "tag": "f2441",
+    "url": "https://www.irs.gov/pub/irs-pdf/f2441.pdf",
+    "sha256": "6c3c2d19163fa4c4de829abf9a89b43f08b4f4f3cb169740fc7da43e914269ce",
+    "pages": 2,
+    "fields": 72,
+    "taxYearVerified": 2025
   }
 ]

@@ -420,7 +420,8 @@ const questionTagArbs = {
   FINCEN_114_ACCOUNT_COUNTRY: words,
   FOREIGN_TRUST_RELATIONSHIP: fc.boolean(),
   LIVE_APART_FROM_SPOUSE: fc.boolean(),
-  DECLINE_EIC: fc.boolean()
+  DECLINE_EIC: fc.boolean(),
+  DECLINE_ACTC: fc.boolean()
 }
 
 export const questions: Arbitrary<Responses> = fc

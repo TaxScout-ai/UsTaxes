@@ -574,6 +574,8 @@ export interface QuestionTag {
   LIVE_APART_FROM_SPOUSE: boolean
   /** Form 1040 line 27c: the taxpayer does not want to claim the EIC. */
   DECLINE_EIC: boolean
+  /** Form 1040 line 28: the taxpayer does not want to claim the additional child tax credit. */
+  DECLINE_ACTC: boolean
 }
 
 export type QuestionTagName = keyof QuestionTag
@@ -587,7 +589,8 @@ export const questionTagNames: QuestionTagName[] = [
   'FINCEN_114_ACCOUNT_COUNTRY',
   'FOREIGN_TRUST_RELATIONSHIP',
   'LIVE_APART_FROM_SPOUSE',
-  'DECLINE_EIC'
+  'DECLINE_EIC',
+  'DECLINE_ACTC'
 ]
 
 export type ValueTag = 'string' | 'boolean'
@@ -947,6 +950,10 @@ export interface EducationCreditEligibility8863 {
 }
 
 export interface Student8863 {
+  /** Form 8863 line 22(2): a Form 1098-T was received from the institution for the tax year. */
+  received1098TCurrentYear?: boolean
+  /** Form 8863 line 22(3): a prior-year Form 1098-T with box 7 checked. */
+  received1098TPriorYearBox7?: boolean
   /** Opaque TaxScout identities; never a name, TIN, or other PII. */
   studentPersonId: string
   educationExpenseSetId: string
@@ -970,6 +977,93 @@ export interface Student8863 {
 export interface Form8863Data {
   contractVersion: typeof FORM_8863_CONTRACT_VERSION
   students: Student8863[]
+}
+
+// --- Form 3903 (Moving Expenses, members of the Armed Forces) ---
+export interface Form3903Data {
+  /** The line 1 / line 2 split when the source states it; the total alone otherwise. */
+  transportationAndStorage?: number
+  travelAndLodging?: number
+  /** Line 3 when lines 1 and 2 are not stated separately. */
+  totalExpenses: number
+  /** Line 4: government reimbursement not in W-2 box 1 (box 12 code P). */
+  governmentReimbursement: number
+  /** The certification box: a Member of the Armed Forces moving under a military order. */
+  armedForcesMoveCertified: boolean
+}
+
+// --- Form 8862 (Information To Claim Certain Credits After Disallowance) ---
+export interface Form8862EicChild {
+  name: string
+  /** Line 7: days the child lived with the filer in the United States. */
+  daysLivedInUS: number
+  /** Line 8, MM/DD, only when the child was born or died during the year. */
+  birthMonthDay?: string
+  deathMonthDay?: string
+}
+
+export interface Form8862NoChildFiler {
+  /** Line 9: days the main home was in the United States. */
+  mainHomeUSDays: number
+  /** Line 10: age at the end of the year. */
+  age: number
+  /** Line 11: can be claimed as a dependent on another return. */
+  dependentOfAnother: boolean
+}
+
+export interface Form8862CtcChild {
+  name: string
+  /** Line 14 */
+  livedWithFilerOverHalfYear: boolean
+  /** Line 15 */
+  qualifyingChild: boolean
+  /** Line 16 */
+  dependent: boolean
+  /** Line 17 */
+  usCitizenNationalOrResident: boolean
+}
+
+export interface Form8862OtherDependent {
+  name: string
+  dependent: boolean
+  usCitizenNationalOrResident: boolean
+}
+
+export interface Form8862Student {
+  name: string
+  /** Line 19a */
+  eligibleStudent: boolean
+  /** Line 19b: the credit was claimed for any four prior years. */
+  claimedFourPriorYears: boolean
+}
+
+export interface Form8862Data {
+  /** Line 1 */
+  taxYear: number
+  /** Line 2 boxes */
+  claimsEic: boolean
+  claimsCtc: boolean
+  claimsAotc: boolean
+  eic?: {
+    /** Line 3 */
+    disallowedOnlyForIncomeReporting: boolean
+    /** Line 4 */
+    qualifyingChildOfAnother: boolean
+    /** Section A */
+    children: Form8862EicChild[]
+    /** Line 6 */
+    scheduleEicShowsQualifyingChild?: boolean
+    /** Section B */
+    primaryWithoutChild?: Form8862NoChildFiler
+    spouseWithoutChild?: Form8862NoChildFiler
+  }
+  ctc?: {
+    children: Form8862CtcChild[]
+    otherDependents: Form8862OtherDependent[]
+  }
+  aotc?: {
+    students: Form8862Student[]
+  }
 }
 
 // --- Form 8606 (Nondeductible IRAs) ---
@@ -1506,6 +1600,10 @@ export interface Information<D = Date> {
   form8919?: Form8919Data
   form4137?: Form4137Data
   form8283?: Form8283Data
+  /** Form 3903: Schedule 1 line 14. */
+  form3903?: Form3903Data
+  /** Form 8862: information only, attached when a credit is claimed after a disallowance. */
+  form8862?: Form8862Data
   form8962?: Form8962Data
   form8814s?: Form8814Data[]
   scheduleRData?: ScheduleRData

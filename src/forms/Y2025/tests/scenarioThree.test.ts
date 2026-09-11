@@ -142,7 +142,7 @@ describe('ATS Scenario 3 (pension, state refund, Schedule D totals, Schedule F w
 
   it('is v4 and reports the absent attachments as null', () => {
     const s = snapshot()
-    expect(s.schemaVersion).toBe('ustaxes-1040-line-snapshot-v7')
+    expect(s.schemaVersion).toBe('ustaxes-1040-line-snapshot-v8')
     expect(s.attachments.scheduleH).toBeNull()
     expect(s.attachments.f5695).toBeNull()
     expect(s.worksheets.socialSecurityBenefits).toBeNull()
