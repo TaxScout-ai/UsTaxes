@@ -8,7 +8,7 @@ import {
 describe('calculation snapshot v2', () => {
   it('exposes the Schedule H and Form 5695 lines behind 1040 lines 23 and 20', () => {
     const snapshot = calculationSnapshot(new F1040(scenarioOneVariation(), []))
-    expect(snapshot.schemaVersion).toBe('ustaxes-1040-line-snapshot-v6')
+    expect(snapshot.schemaVersion).toBe('ustaxes-1040-line-snapshot-v7')
     // Schedule H: 3,100 of cash wages at 12.4% and 2.9%, no FUTA.
     expect(snapshot.attachments.scheduleH?.lines).toMatchObject({
       '1': 3100,
