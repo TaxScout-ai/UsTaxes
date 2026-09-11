@@ -30,6 +30,7 @@ export default class Schedule1 extends F1040Attachment {
     (this.f1040.f8889Spouse?.isNeeded() ?? false) ||
     this.f1040.f8814TotalIncome() > 0 ||
     (this.f1040.info.f1099gs ?? []).length > 0 ||
+    (this.f1040.info.section529Distributions ?? 0) > 0 ||
     (this.f1040.info.educatorExpenses ?? 0) > 0 ||
     (this.f1040.info.selfEmploymentRetirementContributions ?? 0) > 0 ||
     (this.f1040.info.selfEmploymentHealthInsurance ?? 0) > 0 ||
@@ -102,6 +103,8 @@ export default class Schedule1 extends F1040Attachment {
   l8z = (): number => {
     const form8814Income = this.f1040.f8814TotalIncome()
     if (form8814Income > 0) this.otherIncomeStrings.add('Form 8814')
+    const section529 = this.f1040.info.section529Distributions ?? 0
+    if (section529 > 0) this.otherIncomeStrings.add('529 distribution')
     if (
       (this.f1040.f8889.isNeeded() && this.f1040.f8889.l20() > 0) ||
       ((this.f1040.f8889Spouse?.isNeeded() ?? false) &&
@@ -114,7 +117,8 @@ export default class Schedule1 extends F1040Attachment {
     return sumFields([
       this.f1040.f8889.l20(),
       this.f1040.f8889Spouse?.l20(),
-      form8814Income
+      form8814Income,
+      section529
     ])
   }
 
