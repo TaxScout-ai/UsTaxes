@@ -261,13 +261,13 @@ export default class ScheduleD extends F1040Attachment {
   haveQualifiedDividends = (): boolean =>
     this.f1040.f1099Divs().some((f) => f.form.qualifiedDividends > 0)
 
-  // TODO: Schedule D tax worksheet
-  // neither box should be checked if this question was not required to be answered by l20.
-  l22 = (): boolean | undefined => {
-    if (this.l20() !== false) {
-      return this.haveQualifiedDividends()
-    }
-  }
+  /**
+   * Line 22 is reached only past line 20: when line 16 is zero or a loss, or
+   * line 17 is "No". Whichever way line 20 was answered, the form says not to
+   * complete lines 21 and 22, so neither box is checked then.
+   */
+  l22 = (): boolean | undefined =>
+    this.l20() === undefined ? this.haveQualifiedDividends() : undefined
 
   lossCarryForward = (): number => {
     const amount = this.l16() + this.l21Min()

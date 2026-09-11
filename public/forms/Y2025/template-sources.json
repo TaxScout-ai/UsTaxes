@@ -78,5 +78,13 @@
     "pages": 4,
     "fields": 57,
     "taxYearVerified": 2025
+  },
+  {
+    "tag": "f4835",
+    "url": "https://www.irs.gov/pub/irs-pdf/f4835.pdf",
+    "sha256": "8ecc6172e79daf0224b596a4a3f7cc03f481203a71a764544ecd178a939b7b5c",
+    "pages": 3,
+    "fields": 63,
+    "taxYearVerified": 2025
   }
 ]

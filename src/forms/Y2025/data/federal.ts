@@ -189,6 +189,16 @@ const federalBrackets: FederalBrackets = {
   }
 }
 
+/** Schedule SE Part II optional methods, TY2025 (2025 Schedule SE, lines 14–15 and their conditions). */
+export const seOptionalMethod = {
+  /** Line 14: maximum income for the optional methods. */
+  maxNetEarnings: 7240,
+  /** Farm optional method: gross farm income not more than this, or … */
+  farmGrossIncomeLimit: 10860,
+  /** … net farm profits less than this. */
+  farmNetProfitLimit: 7840
+}
+
 export const fica = {
   maxSSTax: 10918.2,
   maxIncomeSSTaxApplies: 176100,
