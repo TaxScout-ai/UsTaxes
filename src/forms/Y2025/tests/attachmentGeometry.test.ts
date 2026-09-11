@@ -83,7 +83,14 @@ it('keeps TY2025 Schedule 1 other-income labels aligned with their meanings', as
   const f = new F1040(info, []).schedule1
   const form = await printed(f.tag, f.namedFields())
   const read = (n: string) =>
-    form.getTextField(`topmostSubform[0].Page1[0].f1_${n}[0]`).getText() ?? ''
+    form
+      .getTextField(
+        form
+          .getFields()
+          .find((field) => field.getName().endsWith(`.f1_${n}[0]`))
+          ?.getName() ?? 'MISSING'
+      )
+      .getText() ?? ''
   expect(read('13')).toBe('') // line 8a, net operating loss
   expect(read('14')).toBe('100') // line 8b, gambling
   expect(read('26')).toBe('') // line 8n, section 951(a) inclusion
