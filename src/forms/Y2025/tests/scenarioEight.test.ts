@@ -172,3 +172,11 @@ describe('ATS Scenario 8 (MFS lived apart, 65+, SS, capital-gain distribution, R
     expect(indicators.primary65OrOlder).toBe(false)
   })
 })
+
+describe('Schedule B is filed only when the instructions require it', () => {
+  it('is not produced for a 1099-DIV that carries only a capital gain distribution', () => {
+    const f = new F1040(scenarioEight(), [])
+    expect(f.scheduleB.isNeeded()).toBe(false)
+    expect(f.schedules().map((s) => s.tag)).not.toContain('f1040sb')
+  })
+})

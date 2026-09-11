@@ -42,8 +42,17 @@ export default class ScheduleB extends F1040Attachment {
     }
   }
 
+  /**
+   * Schedule B is filed when taxable interest or ordinary dividends exceed
+   * $1,500, or when Part III (foreign accounts and trusts) applies; a
+   * 1099-INT or 1099-DIV below that on its own does not require it
+   * (2025 Instructions for Schedule B, "Who Must File").
+   */
   isNeeded = (): boolean =>
-    this.l1Fields().length > 0 || this.l5Fields().length > 0
+    this.l2() > 1500 ||
+    this.l6() > 1500 ||
+    this.f1040.info.questions.FOREIGN_ACCOUNT_EXISTS === true ||
+    this.f1040.info.questions.FOREIGN_TRUST_RELATIONSHIP === true
 
   l1Fields = (): PayerAmount[] =>
     this.f1040
@@ -72,8 +81,7 @@ export default class ScheduleB extends F1040Attachment {
       .concat(Array(rightPad).fill(undefined))
   }
 
-  l2 = (): number =>
-    sumFields(this.l1Fields().map(({ amount }) => amount))
+  l2 = (): number => sumFields(this.l1Fields().map(({ amount }) => amount))
 
   // TODO: Interest from tax exempt savings bonds
   l3 = (): number | undefined => undefined
