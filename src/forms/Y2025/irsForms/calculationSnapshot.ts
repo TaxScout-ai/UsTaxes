@@ -28,6 +28,11 @@ type Lines = Record<string, number | null>
  * 8911 with its first Schedule A (line 9 a ratio in hundred-thousandths,
  * yes/no lines 1/0), Form 6251 when the return carries it, and the spouse's
  * age/blindness boxes among the indicators.
+ *
+ * v7 adds Schedule A (line 18 the election, 1/0), Schedule 8812, Form 8283
+ * (count and totals), Schedule C Part IV miles (44a–44c), and indicators for
+ * the statutory-employee box, the itemize election, a deceased spouse, the
+ * nonresident-alien-spouse election and the line 27c EIC decline.
  */
 const yesNo = (v: boolean | undefined): number | null =>
   v === undefined ? null : v ? 1 : 0
@@ -373,7 +378,74 @@ export function calculationSnapshot(f: F1040) {
               '28': f.scheduleC.l28(),
               '29': f.scheduleC.l29(),
               '30': f.scheduleC.l30(),
-              '31': f.scheduleC.l31()
+              '31': f.scheduleC.l31(),
+              '44a': f.scheduleC.data.vehicle?.businessMiles ?? null,
+              '44b': f.scheduleC.data.vehicle?.commutingMiles ?? null,
+              '44c': f.scheduleC.data.vehicle?.otherMiles ?? null
+            } as Lines
+          },
+    scheduleA: !f.scheduleA.isNeeded()
+      ? null
+      : {
+          lines: {
+            '1': f.scheduleA.l1(),
+            '2': f.scheduleA.l2(),
+            '3': f.scheduleA.l3(),
+            '4': f.scheduleA.l4(),
+            '5a': f.scheduleA.l5a(),
+            '5b': f.scheduleA.l5b(),
+            '5c': f.scheduleA.l5c(),
+            '5d': f.scheduleA.l5d(),
+            '5e': f.scheduleA.l5e(),
+            '6': f.scheduleA.l6() ?? null,
+            '7': f.scheduleA.l7(),
+            '8a': f.scheduleA.l8a(),
+            '8b': f.scheduleA.l8b(),
+            '8c': f.scheduleA.l8c(),
+            '8e': f.scheduleA.l8e(),
+            '9': f.scheduleA.l9() ?? null,
+            '10': f.scheduleA.l10(),
+            '11': f.scheduleA.l11(),
+            '12': f.scheduleA.l12(),
+            '13': f.scheduleA.l13(),
+            '14': f.scheduleA.l14(),
+            '15': f.scheduleA.l15(),
+            '16': f.scheduleA.l16(),
+            '17': f.scheduleA.l17(),
+            '18': yesNo(f.scheduleA.l18())
+          } as Lines
+        },
+    schedule8812: !f.schedule8812.isNeeded()
+      ? null
+      : {
+          lines: {
+            '1': f.schedule8812.l1(),
+            '2a': f.schedule8812.l2a(),
+            '2b': f.schedule8812.l2b(),
+            '2c': f.schedule8812.l2c(),
+            '2d': f.schedule8812.l2d(),
+            '3': f.schedule8812.l3(),
+            '4': f.schedule8812.l4(),
+            '5': f.schedule8812.l5(),
+            '6': f.schedule8812.l6(),
+            '7': f.schedule8812.l7(),
+            '8': f.schedule8812.l8(),
+            '9': f.schedule8812.l9(),
+            '10': f.schedule8812.l10(),
+            '11': f.schedule8812.l11(),
+            '12': f.schedule8812.l12(),
+            '13': f.schedule8812.l13(),
+            '14': f.schedule8812.l14()
+          } as Lines
+        },
+    f8283:
+      f.f8283 === undefined || !f.f8283.isNeeded()
+        ? null
+        : {
+            lines: {
+              count: f.f8283.data.contributions.length,
+              totalFmv: f.f8283.totalFMV(),
+              totalCost: f.f8283.totalCostBasis()
             } as Lines
           },
     f7206:
@@ -524,10 +596,20 @@ export function calculationSnapshot(f: F1040) {
     primaryBlind: f.blind(),
     /** The spouse's boxes on a joint return; false when the return has no spouse. */
     spouse65OrOlder: f.spouseBeforeDate(),
-    spouseBlind: f.spouseBlind()
+    spouseBlind: f.spouseBlind(),
+    /** Schedule C line 1 box: the receipts are a statutory employee's W-2 wages (first copy). */
+    scheduleCStatutoryEmployee: f.scheduleC?.data.statutoryEmployee ?? false,
+    /** Schedule A line 18: itemized although below the standard deduction. */
+    itemizedDeductionsElected: f.scheduleA.isNeeded() && f.scheduleA.l18(),
+    /** The spouse died during the year (date of death on the form). */
+    spouseDeceased: f.info.taxPayer.spouse?.dateOfDeath !== undefined,
+    /** The nonresident-alien spouse is treated as a resident (box and name on the form). */
+    nraSpouseTreatedAsResident: f.nraSpouseTreatedAsResident(),
+    /** Line 27c: the EIC is not claimed. */
+    eicDeclined: f.eicDeclined()
   }
   return {
-    schemaVersion: 'ustaxes-1040-line-snapshot-v6',
+    schemaVersion: 'ustaxes-1040-line-snapshot-v7',
     taxYear: 2025,
     form: '1040',
     lines,

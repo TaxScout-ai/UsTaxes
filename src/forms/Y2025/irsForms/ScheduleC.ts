@@ -1,12 +1,10 @@
 import F1040Attachment from './F1040Attachment'
 import { Field } from 'ustaxes/core/pdfFiller'
 import { FormTag } from 'ustaxes/core/irsForms/Form'
-import {
-  ScheduleCData,
-  ScheduleCAccountingMethod
-} from 'ustaxes/core/data'
+import { ScheduleCData, ScheduleCAccountingMethod } from 'ustaxes/core/data'
 import { sumFields } from 'ustaxes/core/irsForms/util'
 import F1040 from './F1040'
+import { standardMileageRateCents } from '../data/federal'
 
 /**
  * Schedule C — Profit or Loss from Business (Sole Proprietorship)
@@ -40,8 +38,12 @@ export default class ScheduleC extends F1040Attachment {
 
   // --- Part I: Income ---
 
-  // Line 1: Gross receipts or sales
-  l1 = (): number => this.data.grossReceipts
+  // Line 1: Gross receipts or sales; a statutory employee's W-2 wages when the box is checked.
+  l1 = (): number =>
+    this.data.grossReceipts +
+    (this.data.statutoryEmployee
+      ? this.f1040.statutoryEmployeeWages(this.data.personRole)
+      : 0)
 
   // Line 2: Returns and allowances
   l2 = (): number => this.data.returns
@@ -66,8 +68,15 @@ export default class ScheduleC extends F1040Attachment {
   // Line 8: Advertising
   l8 = (): number => this.data.advertising
 
-  // Line 9: Car and truck expenses
-  l9 = (): number => this.data.carAndTruck
+  // Line 9: Car and truck expenses; with Part IV, the standard mileage deduction for the business miles.
+  l9 = (): number => this.data.carAndTruck + this.standardMileageDeduction()
+  /** Business miles at the year's rate, whole dollars half up (Part IV line 44a). */
+  standardMileageDeduction = (): number =>
+    this.data.vehicle === undefined
+      ? 0
+      : Math.round(
+          (this.data.vehicle.businessMiles * standardMileageRateCents) / 100
+        )
 
   // Line 10: Commissions and fees
   l10 = (): number => this.data.commissions
@@ -232,8 +241,7 @@ export default class ScheduleC extends F1040Attachment {
   l42 = (): number => Math.max(0, this.l40() - this.l41())
 
   // Statutory employee income (for Schedule 8812 earned income calculation)
-  statutoryEmployeeIncome = (): number | undefined =>
-    this.l1()
+  statutoryEmployeeIncome = (): number | undefined => this.l1()
 
   // Net profit or loss for Schedule SE
   netProfitOrLoss = (): number => this.l31()
@@ -267,7 +275,7 @@ export default class ScheduleC extends F1040Attachment {
     !this.data.didFile1099s, // 18: J – No
 
     // --- Part I: Income ---
-    false, // 19: Line 1 – Statutory employee checkbox
+    this.data.statutoryEmployee ?? false, // 19: Line 1 – Statutory employee checkbox
     this.l1(), // 20: Line 1
     this.l2(), // 21: Line 2
     this.l3(), // 22: Line 3
@@ -330,20 +338,20 @@ export default class ScheduleC extends F1040Attachment {
     this.l42(), // 71: Line 42
 
     // --- Part IV: Information on Your Vehicle ---
-    undefined, // 72: Line 43 – month
-    undefined, // 73: Line 43 – day
-    undefined, // 74: Line 43 – year
-    undefined, // 75: Line 44a – Business miles
-    undefined, // 76: Line 44b – Commuting miles
-    undefined, // 77: Line 44c – Other miles
-    undefined, // 78: Line 45 – Yes
-    undefined, // 79: Line 45 – No
-    undefined, // 80: Line 46 – Yes
-    undefined, // 81: Line 46 – No
-    undefined, // 82: Line 47a – Yes
-    undefined, // 83: Line 47a – No
-    undefined, // 84: Line 47b – Yes
-    undefined, // 85: Line 47b – No
+    this.data.vehicle?.placedInServiceDate.slice(5, 7), // 72: Line 43 – month
+    this.data.vehicle?.placedInServiceDate.slice(8, 10), // 73: Line 43 – day
+    this.data.vehicle?.placedInServiceDate.slice(0, 4), // 74: Line 43 – year
+    this.data.vehicle?.businessMiles, // 75: Line 44a – Business miles
+    this.data.vehicle?.commutingMiles, // 76: Line 44b – Commuting miles
+    this.data.vehicle?.otherMiles, // 77: Line 44c – Other miles
+    this.data.vehicle ? this.data.vehicle.availableForPersonalUse : undefined, // 78: Line 45 – Yes
+    this.data.vehicle ? !this.data.vehicle.availableForPersonalUse : undefined, // 79: Line 45 – No
+    this.data.vehicle ? this.data.vehicle.anotherVehicleAvailable : undefined, // 80: Line 46 – Yes
+    this.data.vehicle ? !this.data.vehicle.anotherVehicleAvailable : undefined, // 81: Line 46 – No
+    this.data.vehicle ? this.data.vehicle.hasEvidence : undefined, // 82: Line 47a – Yes
+    this.data.vehicle ? !this.data.vehicle.hasEvidence : undefined, // 83: Line 47a – No
+    this.data.vehicle ? this.data.vehicle.evidenceIsWritten : undefined, // 84: Line 47b – Yes
+    this.data.vehicle ? !this.data.vehicle.evidenceIsWritten : undefined, // 85: Line 47b – No
 
     // --- Part V: Other Expenses (9 rows of description + amount) ---
     undefined, // 86: Row 1 description

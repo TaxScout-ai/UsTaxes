@@ -72,6 +72,10 @@ export type PrimaryPersonDateString = PrimaryPerson<string>
 
 export interface Spouse<D = Date> extends Person<D> {
   isTaxpayerDependent: boolean
+  /** ISO date when the spouse died during the tax year (surviving spouse files jointly). */
+  dateOfDeath?: string
+  /** The section 6013(g)/(h) election: a nonresident alien spouse treated as a U.S. resident. */
+  nonresidentAlienTreatedAsResident?: boolean
 }
 
 export type SpouseDateString = Spouse<string>
@@ -107,6 +111,8 @@ export interface IncomeW2 {
   stateWages?: number
   stateWithholding?: number
   box12?: W2Box12Info
+  /** Box 13: a statutory employee's wages go to Schedule C line 1, not Form 1040 line 1a. */
+  statutoryEmployee?: boolean
 }
 
 export interface EstimatedTaxPayments {
@@ -494,6 +500,8 @@ export interface ItemizedDeductions {
   casualtyAndTheftLosses?: string | number
   otherItemizedDeductions?: string | number
   otherTaxes?: string | number
+  /** Schedule A line 18: itemize even though the total is below the standard deduction. */
+  electToItemize?: boolean
 }
 
 export type State =
@@ -564,6 +572,8 @@ export interface QuestionTag {
   FINCEN_114_ACCOUNT_COUNTRY: string
   FOREIGN_TRUST_RELATIONSHIP: boolean
   LIVE_APART_FROM_SPOUSE: boolean
+  /** Form 1040 line 27c: the taxpayer does not want to claim the EIC. */
+  DECLINE_EIC: boolean
 }
 
 export type QuestionTagName = keyof QuestionTag
@@ -576,7 +586,8 @@ export const questionTagNames: QuestionTagName[] = [
   'FINCEN_114',
   'FINCEN_114_ACCOUNT_COUNTRY',
   'FOREIGN_TRUST_RELATIONSHIP',
-  'LIVE_APART_FROM_SPOUSE'
+  'LIVE_APART_FROM_SPOUSE',
+  'DECLINE_EIC'
 ]
 
 export type ValueTag = 'string' | 'boolean'
@@ -683,8 +694,32 @@ export interface ScheduleCData {
   // Part IV: Vehicle (simplified)
   vehicleMiles?: number
   businessMiles?: number
+  /** Part IV in full; line 9 then carries the standard mileage deduction for the business miles. */
+  vehicle?: ScheduleCVehicle
+  /** Line 1 box: the proprietor's statutory-employee W-2 wages are the receipts; no Schedule SE. */
+  statutoryEmployee?: boolean
   // Home office (from Form 8829)
   homeOfficeDeduction?: number
+}
+
+/** Schedule C Part IV — Information on Your Vehicle (lines 43–47). */
+export interface ScheduleCVehicle {
+  /** Line 43: date placed in service for business, YYYY-MM-DD. */
+  placedInServiceDate: string
+  /** Line 44a. */
+  businessMiles: number
+  /** Line 44b. */
+  commutingMiles: number
+  /** Line 44c. */
+  otherMiles: number
+  /** Line 45. */
+  availableForPersonalUse: boolean
+  /** Line 46. */
+  anotherVehicleAvailable: boolean
+  /** Line 47a. */
+  hasEvidence: boolean
+  /** Line 47b. */
+  evidenceIsWritten: boolean
 }
 
 // --- Form 8829 (Home Office Deduction) ---

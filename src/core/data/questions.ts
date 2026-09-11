@@ -60,6 +60,12 @@ export const questions: Question[] = [
     (s: Information) =>
       s.taxPayer.filingStatus == FilingStatus.MFS &&
       s.f1099s.some((i) => i.type == Income1099Type.SSA)
+  ),
+  q(
+    'DECLINE_EIC',
+    `Do you elect not to claim the earned income credit (Form 1040 line 27c)?`,
+    'boolean',
+    () => true
   )
 ]
 

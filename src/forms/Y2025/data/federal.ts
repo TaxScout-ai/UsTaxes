@@ -406,3 +406,6 @@ export const SSBenefits: SocialSecurityBenefitsDef = {
     [FilingStatus.MFJ]: { l8: 32000, l10: 12000 }
   }
 }
+
+/** Schedule C line 9 standard mileage rate for 2025, cents per business mile (Notice 2025-5). */
+export const standardMileageRateCents = 70

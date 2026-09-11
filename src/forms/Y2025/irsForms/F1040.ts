@@ -380,6 +380,11 @@ export default class F1040 extends F1040Base {
       (sum, sc) => sum + sc.netProfitOrLoss(),
       0
     )
+  /** Schedule C profit subject to self-employment tax: a statutory employee's is not. */
+  scheduleCSelfEmploymentProfit = (): number =>
+    (this._scheduleCList ?? [])
+      .filter((sc) => !sc.data.statutoryEmployee)
+      .reduce((sum, sc) => sum + sc.netProfitOrLoss(), 0)
 
   // All Schedule C forms (for copies pattern)
   get scheduleCList(): ScheduleC[] {
@@ -545,8 +550,18 @@ export default class F1040 extends F1040Base {
    */
   wages = (): number =>
     sumToWholeDollars(
-      this.validW2s().map((w2) => w2.income),
+      this.validW2s()
+        .filter((w2) => !w2.statutoryEmployee)
+        .map((w2) => w2.income),
       'W-2 box 1'
+    )
+  /** Box 1 of the statutory-employee W-2s of one person: Schedule C line 1, not line 1a. */
+  statutoryEmployeeWages = (role: PersonRole): number =>
+    sumToWholeDollars(
+      this.validW2s()
+        .filter((w2) => w2.statutoryEmployee && w2.personRole === role)
+        .map((w2) => w2.income),
+      'W-2 box 1 (statutory employee)'
     )
   medicareWages = (): number =>
     this.validW2s().reduce((res, w2) => res + w2.medicareIncome, 0)
@@ -824,6 +839,17 @@ export default class F1040 extends F1040Base {
 
   l27 = (): number =>
     this.scheduleEIC.isNeeded() ? this.scheduleEIC.credit() : 0
+  /** Line 27c: the taxpayer elected not to claim the EIC. */
+  eicDeclined = (): boolean => this.info.questions.DECLINE_EIC ?? false
+  /** The spouse's date of death as the form prints it, when the spouse died during the year. */
+  spouseDateOfDeathText = (): string => {
+    const iso = this.info.taxPayer.spouse?.dateOfDeath
+    if (iso === undefined) return ''
+    const [y, m, d] = iso.split('-')
+    return `${m}/${d}/${y}`
+  }
+  nraSpouseTreatedAsResident = (): boolean =>
+    this.info.taxPayer.spouse?.nonresidentAlienTreatedAsResident ?? false
 
   // TODO: handle taxpayers between 1998 and 2004 that
   // can claim themselves for eic.
@@ -1054,8 +1080,7 @@ export default class F1040 extends F1040Base {
     set('line_26', this.l26())
     set('line_27a', this.l27())
     // TY2025 line 27c is an election NOT to claim EIC, not an age test.
-    // The current input has no opt-out election; do not infer one from age.
-    set('line_27c', false)
+    set('line_27c', this.eicDeclined())
     set('line_28', this.l28())
     set('line_29', this.l29())
     set('line_31', this.l31())
@@ -1087,8 +1112,8 @@ export default class F1040 extends F1040Base {
     [
       // ══ PAGE 1 (128 fields, 0-127) ══
       // Header
-      '', // [  0] f1_01
-      '', // [  1] f1_02
+      '', // [  0] f1_01 deceased (primary) MM/DD/YYYY
+      this.spouseDateOfDeathText(), // [  1] f1_02 deceased (spouse) MM/DD/YYYY
       '', // [  2] f1_03
       false, // [  3] c1_1
       false, // [  4] c1_2
@@ -1132,8 +1157,8 @@ export default class F1040 extends F1040Base {
         ? this.spouseFullName()
         : '', // [ 37] f1_28 MFS spouse name
       this.info.taxPayer.filingStatus === FilingStatus.W, // [ 38] c1_8  QSS
-      false, // [ 39] c1_8[1] nonresident
-      '', // [ 40] f1_29 QSS deceased
+      this.nraSpouseTreatedAsResident(), // [ 39] c1_8[1] nonresident alien spouse treated as resident
+      this.nraSpouseTreatedAsResident() ? this.spouseFullName() ?? '' : '', // [ 40] f1_29 that spouse's name
       this.info.questions.CRYPTO ?? false, // [ 41] c1_9  digital assets yes
       '', // [ 42] f1_30
       !(this.info.questions.CRYPTO ?? true), // [ 43] c1_10 digital assets no

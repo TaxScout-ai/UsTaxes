@@ -15,7 +15,7 @@ export default class ScheduleSE extends F1040Attachment {
       // methods (Part II), not additional profit under the regular method.
       .map((k1) => k1.selfEmploymentEarningsA)
       .reduce((a, b) => a + b, 0) > 0 ||
-    this.f1040.scheduleCNetProfit() !== 0 ||
+    this.f1040.scheduleCSelfEmploymentProfit() !== 0 ||
     this.f1040.scheduleFNetProfit() !== 0 ||
     this.farmOptionalMethod()
 
@@ -65,7 +65,7 @@ export default class ScheduleSE extends F1040Attachment {
   l1b = (): number => 0
 
   l2 = (): number => {
-    const schCL31 = this.f1040.scheduleCNetProfit()
+    const schCL31 = this.f1040.scheduleCSelfEmploymentProfit()
     const k1SEA = this.f1040.info.scheduleK1Form1065s.reduce(
       (c, k1) => c + k1.selfEmploymentEarningsA,
       0

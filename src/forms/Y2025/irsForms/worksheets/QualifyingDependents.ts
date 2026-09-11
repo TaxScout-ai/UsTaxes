@@ -25,8 +25,8 @@ export default class QualifyingDependents {
     !this.qualifiesChild(d) &&
     this.year - d.dateOfBirth.getFullYear() <
       (d.qualifyingInfo.isStudent
-        ? federal.QualifyingDependents.qualifyingDependentMaxAge
-        : federal.QualifyingDependents.qualifyingStudentMaxAge)
+        ? federal.QualifyingDependents.qualifyingStudentMaxAge
+        : federal.QualifyingDependents.qualifyingDependentMaxAge)
 
   qualifyingChildren = (): Dependent[] =>
     this.f1040.info.taxPayer.dependents.filter((dep) =>

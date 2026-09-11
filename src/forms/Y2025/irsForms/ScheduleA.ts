@@ -4,6 +4,7 @@ import { FormTag } from 'ustaxes/core/irsForms/Form'
 import { Field } from 'ustaxes/core/pdfFiller'
 import F1040 from './F1040'
 import { SCHEDULE_A_FIELDS } from '../fieldMaps'
+import { roundLine } from './rounding'
 
 const blankItemizedDeductions = {
   medicalAndDental: 0,
@@ -35,6 +36,7 @@ export default class ScheduleA extends F1040Attachment {
 
   isNeeded = (): boolean => {
     if (this.f1040.info.itemizedDeductions !== undefined) {
+      if (this.f1040.info.itemizedDeductions.electToItemize) return true
       const standardDeduction = this.f1040.standardDeduction()
       const itemizedAmount = this.deductions()
       return (
@@ -54,7 +56,7 @@ export default class ScheduleA extends F1040Attachment {
 
   l2 = (): number => this.f1040.l11()
 
-  l3 = (): number => this.l2() * 0.075
+  l3 = (): number => roundLine(this.l2() * 0.075)
 
   l4 = (): number => Math.max(0, this.l1() - this.l3())
 
@@ -132,14 +134,17 @@ export default class ScheduleA extends F1040Attachment {
   l17 = (): number =>
     this.l4() + this.l7() + this.l10() + this.l14() + this.l15() + this.l16()
 
-  l18 = (): boolean => false
+  /** Line 18: the election to itemize although the total is below the standard deduction. */
+  l18 = (): boolean =>
+    (this.itemizedDeductions.electToItemize ?? false) &&
+    this.deductions() <= Number(this.f1040.standardDeduction())
 
   namedFields = (): Record<string, Field> => {
     const fm = SCHEDULE_A_FIELDS
     const vals: Record<string, Field> = {}
     const set = (key: string, value: Field) => {
       const f = fm[key]
-      if (f && value !== undefined && value !== null) vals[f] = value
+      if (f && value !== undefined) vals[f] = value
     }
     set('name', this.f1040.namesString())
     set('ssn', this.f1040.info.taxPayer.primaryPerson.ssid)

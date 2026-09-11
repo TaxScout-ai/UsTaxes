@@ -297,6 +297,8 @@ export default class ScheduleEIC extends F1040Attachment {
 
   allowed = (): boolean => {
     return (
+      // Form 1040 line 27c: the taxpayer does not want to claim the credit.
+      !(this.f1040.info.questions.DECLINE_EIC ?? false) &&
       // Step 1
       (this.atLeastOneChild() || this.over25Under65()) &&
       this.passIncomeLimit() &&
