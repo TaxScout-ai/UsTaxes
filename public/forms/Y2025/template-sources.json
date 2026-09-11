@@ -110,5 +110,13 @@
     "pages": 1,
     "fields": 35,
     "taxYearVerified": 2025
+  },
+  {
+    "tag": "f8283",
+    "url": "https://www.irs.gov/pub/irs-pdf/f8283.pdf",
+    "sha256": "389ab1b7c01b542724092f82a55dd43ab00792770b5254a87c4cd4082d8d4c69",
+    "pages": 2,
+    "fields": 117,
+    "taxYearVerified": 2025
   }
 ]
