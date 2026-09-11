@@ -23,6 +23,11 @@ type Lines = Record<string, number | null>
  * v5 adds Schedule C and Form 7206 (first copies), Schedule 1 lines 16/17,
  * and reports Form 7206 line 6 (a five-decimal ratio) as an integer in
  * hundred-thousandths so every line stays a whole number.
+ *
+ * v6 adds the credit chain behind line 20: Schedule 3 lines 6j and 7, Form
+ * 8911 with its first Schedule A (line 9 a ratio in hundred-thousandths,
+ * yes/no lines 1/0), Form 6251 when the return carries it, and the spouse's
+ * age/blindness boxes among the indicators.
  */
 const yesNo = (v: boolean | undefined): number | null =>
   v === undefined ? null : v ? 1 : 0
@@ -139,9 +144,76 @@ export function calculationSnapshot(f: F1040) {
         '5a': f.schedule3.l5a() ?? null,
         '5b': f.schedule3.l5b() ?? null,
         '5': f.schedule3.l5(),
+        '6j': f.schedule3.l6j() ?? null,
+        '7': f.schedule3.l7(),
         '8': f.schedule3.l8()
       } as Lines
     },
+    f8911:
+      f.f8911 === undefined
+        ? null
+        : {
+            lines: {
+              A: f.f8911.lA(),
+              '1': f.f8911.l1(),
+              '2': f.f8911.l2() ?? null,
+              '3': f.f8911.l3(),
+              '4': f.f8911.l4(),
+              '5': f.f8911.l5(),
+              '6a': f.f8911.l6a() ?? null,
+              '6b': f.f8911.l6b(),
+              '6c': f.f8911.l6c(),
+              '7': f.f8911.l7(),
+              '8': f.f8911.l8(),
+              '9': f.f8911.l9(),
+              '10': f.f8911.l10()
+            } as Lines
+          },
+    f8911ScheduleA:
+      f.f8911 === undefined
+        ? null
+        : (() => {
+            const [a] = f.f8911.schedules
+            return {
+              lines: {
+                '6a': yesNo(a.l6a()),
+                '8': a.l8(),
+                '9': Math.round(a.l9() * 100000),
+                '10': a.l10(),
+                '11': a.l11() ?? null,
+                '12': a.l12() ?? null,
+                '13': yesNo(a.l13()),
+                '14': a.l14() ?? null,
+                '15': a.l15(),
+                '16': a.l16() ?? null,
+                '17': yesNo(a.l17()),
+                '18': a.l18() ?? null,
+                '19': a.l19() ?? null,
+                '20': a.l20(),
+                '21': a.l21() ?? null
+              } as Lines
+            }
+          })(),
+    f6251: !f.f6251.isNeeded()
+      ? null
+      : {
+          lines: {
+            '1a': f.f6251.l1a(),
+            '1b': f.f6251.l1b(),
+            '2a': f.f6251.l2a() ?? null,
+            '2b': f.f6251.l2b() ?? null,
+            '2e': f.f6251.l2e() ?? null,
+            '2i': f.f6251.l2i() ?? null,
+            '4': f.f6251.l4(),
+            '5': f.f6251.l5() ?? null,
+            '6': f.f6251.l6(),
+            '7': f.f6251.l7() ?? null,
+            '8': f.f6251.l8() ?? null,
+            '9': f.f6251.l9(),
+            '10': f.f6251.l10(),
+            '11': f.f6251.l11()
+          } as Lines
+        },
     schedule1: !f.schedule1.isNeeded()
       ? null
       : {
@@ -449,10 +521,13 @@ export function calculationSnapshot(f: F1040) {
     scheduleDNotRequired: f.l7Box(),
     /** Line 12d boxes as the standard deduction counts them. */
     primary65OrOlder: f.bornBeforeDate(),
-    primaryBlind: f.blind()
+    primaryBlind: f.blind(),
+    /** The spouse's boxes on a joint return; false when the return has no spouse. */
+    spouse65OrOlder: f.spouseBeforeDate(),
+    spouseBlind: f.spouseBlind()
   }
   return {
-    schemaVersion: 'ustaxes-1040-line-snapshot-v5',
+    schemaVersion: 'ustaxes-1040-line-snapshot-v6',
     taxYear: 2025,
     form: '1040',
     lines,

@@ -821,6 +821,35 @@ export interface Form7206Data {
   longTermCarePremiums: number
 }
 
+/** Schedule A (Form 8911): one qualified alternative fuel vehicle refueling property. */
+export interface Form8911PropertyData {
+  /** Line 2a: description of the refueling property. */
+  description: string
+  /** Line 3a: where the property is (the home address when it is installed there). */
+  location: Address
+  /** Line 4: date construction began, YYYY-MM-DD. */
+  constructionStartDate: string
+  /** Line 5: date placed in service, YYYY-MM-DD; must fall in the tax year. */
+  placedInServiceDate: string
+  /** Line 6a: placed in service in an eligible census tract (no credit otherwise). */
+  eligibleCensusTract: boolean
+  /** Line 6b: the 11-digit census tract GEOID, required when line 6a is yes. */
+  censusTractGeoid?: string
+  /** Line 7: certification or permit number, when one was issued. */
+  certificationOrPermitNumber?: string
+  /** Line 8: cost of the property. */
+  cost: number
+  /** Line 9: business/investment use as a fraction of one; 0 when personal only. */
+  businessUseFraction: number
+  /** Line 17: installed on property used as the taxpayer's main home. */
+  installedAtMainHome: boolean
+}
+
+/** Form 8911: the alternative fuel vehicle refueling property credit, one Schedule A per property. */
+export interface Form8911Data {
+  properties: Form8911PropertyData[]
+}
+
 /** Schedule SE Part II: the taxpayer elects an optional method to figure net earnings. */
 export interface ScheduleSEOptions {
   /** Farm optional method (lines 14–15): allowed when gross farm income is at or below the limit or net farm profit is below it. */
@@ -1415,6 +1444,8 @@ export interface Information<D = Date> {
   scheduleSEOptions?: ScheduleSEOptions
   /** Form 7206 per trade or business; Schedule 1 line 17 is their sum (replaces the scalar when present). */
   form7206s?: Form7206Data[]
+  /** Form 8911 with one Schedule A per refueling property; the personal-use part → Schedule 3 line 6j. */
+  form8911?: Form8911Data
   form2555s?: Form2555Data[]
   form8582?: Form8582Data
   form4797?: Form4797Data

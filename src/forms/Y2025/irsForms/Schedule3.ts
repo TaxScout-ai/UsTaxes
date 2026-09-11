@@ -20,6 +20,7 @@ export default class Schedule3 extends F1040Attachment {
     (this.f1040.f5695?.credit() ?? 0) > 0 ||
     (this.f1040.scheduleR?.l22() ?? 0) > 0 ||
     (this.f1040.f8801?.credit() ?? 0) > 0 ||
+    (this.f1040.f8911?.l10() ?? 0) > 0 ||
     this.l15() > 0
 
   deductions = (): number => 0
@@ -44,7 +45,11 @@ export default class Schedule3 extends F1040Attachment {
   l6g = (): number | undefined => undefined // TODO: other credits
   l6h = (): number | undefined => undefined // District of Columbia first-time homebuyer
   l6i = (): number | undefined => undefined // TODO: other credits
-  l6j = (): number | undefined => undefined // TODO: other credits
+  /** Line 6j: the personal-use part of the Form 8911 refueling property credit. */
+  l6j = (): number | undefined => {
+    const credit = this.f1040.f8911?.l10() ?? 0
+    return credit > 0 ? credit : undefined
+  }
   l6k = (): number | undefined => undefined // TODO: other credits
   l6l = (): number | undefined => undefined // TODO: other credits
   l6m = (): number | undefined => undefined // Previously owned clean vehicles
