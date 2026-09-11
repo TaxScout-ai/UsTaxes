@@ -92,9 +92,9 @@ describe('ATS Scenario 12 (W-2, Schedule C, Schedule SE, Form 7206)', () => {
     expect(lines['37']).toBe(7448)
   })
 
-  it('is v5 and reports the absent attachments as null', () => {
+  it('is v6 and reports the absent attachments as null', () => {
     const s = snapshot()
-    expect(s.schemaVersion).toBe('ustaxes-1040-line-snapshot-v5')
+    expect(s.schemaVersion).toBe('ustaxes-1040-line-snapshot-v6')
     expect(s.attachments.scheduleF).toBeNull()
     expect(s.attachments.f4835).toBeNull()
     expect(s.attachments.scheduleD).toBeNull()

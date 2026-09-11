@@ -69,6 +69,7 @@ import F8880 from './F8880'
 import ScheduleF from './ScheduleF'
 import F4835 from './F4835'
 import F7206 from './F7206'
+import F8911 from './F8911'
 import F4562 from './F4562'
 import F8801 from './F8801'
 import Schedule1A from './Schedule1A'
@@ -114,6 +115,7 @@ export default class F1040 extends F1040Base {
   f5695?: F5695
   scheduleH?: ScheduleH
   f6251: F6251
+  f8911?: F8911
   f8606?: F8606
   _f8606List?: F8606[]
   f8283?: F8283
@@ -261,6 +263,10 @@ export default class F1040 extends F1040Base {
     }
     if (this.info.scheduleH !== undefined) {
       this.scheduleH = new ScheduleH(this, this.info.scheduleH)
+    }
+    // Form 8911 with a Schedule A per refueling property; Schedule 3 line 6j.
+    if (this.info.form8911 !== undefined) {
+      this.f8911 = new F8911(this, this.info.form8911)
     }
 
     // Create Form 4137 for unreported tip income
@@ -468,6 +474,8 @@ export default class F1040 extends F1040Base {
       this.f5695,
       this.scheduleH,
       this.f6251,
+      this.f8911,
+      ...(this.f8911?.schedules ?? []),
       this.f8582,
       this.f8814,
       this.f8888,
