@@ -35,3 +35,5 @@ Worksheet. Scenario 12 is a rehearsal, not an assigned ATS expected-result file.
 The conditional qualified-business example has QBI 21,609, deduction 4,322,
 taxable income 102,373 and ordinary tax 17,436. The source PDF does not establish
 all eligibility/carryforward facts; its blank QBI line is not a verified election.
+
+Independent review follow-up: a negative K-1 above the Form 8995 threshold now refuses with the missing Form 8995-A Schedule C loss-netting requirement, instead of passing a signed loss through the legacy phased-in reduction. Mixed positive/negative businesses are refused too. This does not claim full Form 8995-A support. The Schedule C row on Form 8995 now uses the supplied business EIN, falling back to filer SSN only when no EIN is supplied. Both boundaries are exercised through F1040.

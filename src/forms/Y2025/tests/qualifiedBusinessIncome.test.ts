@@ -62,6 +62,32 @@ describe('TY2025 Form8995 from actual F1040', () => {
     expect(q.fields()[4]).toBe(21609)
     expect(q.fields()[30]).toBe(4322)
   })
+  it('identifies the Schedule C business by its EIN when present', () => {
+    const info = scenarioTwelveInformation({ scheduleCQbi: qualified() })
+    if (!info.scheduleCBusinesses)
+      throw new Error('Fixture requires Schedule C')
+    info.scheduleCBusinesses[0].ein = '000000001'
+    const q = new F1040(info, []).f8995 as F8995
+    expect(q.businessRows()[0].tin).toBe('000000001')
+    expect(q.fields()[3]).toBe('000000001')
+    info.scheduleCBusinesses[0].ein = undefined
+    expect((new F1040(info, []).f8995 as F8995).businessRows()[0].tin).toBe(
+      info.taxPayer.primaryPerson.ssid
+    )
+  })
+  it.each([[-4000], [10000, -4000]])(
+    'refuses above-threshold losses without the required Form 8995-A Schedule C',
+    (...amounts) => {
+      const info = {
+        ...rehearsalInformation(300000),
+        scheduleK1Form1065s: amounts.map((amount) => ({
+          ...partner(amount),
+          ordinaryBusinessIncome: amount
+        }))
+      }
+      expect(() => new F1040(info, [])).toThrow(/loss netting and carryforward/)
+    }
+  )
   it('carries a prior qualified loss as a reduction and reports unused loss', () => {
     const f = new F1040(
       scenarioTwelveInformation({

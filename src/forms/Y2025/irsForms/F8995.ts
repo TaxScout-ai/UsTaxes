@@ -109,7 +109,7 @@ export default class F8995 extends F1040Attachment {
         roundLine(this.f1040.schedule1.l17() ?? 0)
       rows.push({
         name: b.data.businessName,
-        tin: this.f1040.info.taxPayer.primaryPerson.ssid,
+        tin: b.data.ein || this.f1040.info.taxPayer.primaryPerson.ssid,
         qbi: roundLine(adjusted)
       })
     }

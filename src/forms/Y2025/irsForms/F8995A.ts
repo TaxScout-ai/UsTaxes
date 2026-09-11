@@ -1,4 +1,6 @@
 import F8995, { getF8995PhaseOutIncome } from './F8995'
+import F1040 from './F1040'
+import { TaxFormInputError } from './formInput'
 
 import { FormTag } from 'ustaxes/core/irsForms/Form'
 import { FilingStatus } from 'ustaxes/core/data'
@@ -16,6 +18,18 @@ function ifNumber(
 export default class F8995A extends F8995 {
   tag: FormTag = 'f8995a'
   sequenceIndex = 55.5
+
+  constructor(f1040: F1040) {
+    super(f1040)
+    // IRS i8995a, Schedule C: loss allocation and carryforward must precede
+    // the wages/UBIA limit. The legacy form does not produce that schedule.
+    if (f1040.info.scheduleK1Form1065s.some((k) => k.section199AQBI < 0))
+      throw new TaxFormInputError(
+        'unsupported',
+        '/information/scheduleK1Form1065s',
+        'Form 8995-A qualified business losses require Schedule C loss netting and carryforward'
+      )
+  }
 
   l2a = (): number | undefined => this.applicableK1s()[0]?.section199AQBI
   l2b = (): number | undefined => this.applicableK1s()[1]?.section199AQBI
