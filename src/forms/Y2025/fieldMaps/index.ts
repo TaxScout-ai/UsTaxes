@@ -149,9 +149,9 @@ export const F1040_FIELDS: Record<string, string> = {
 export const SCHEDULE1_FIELDS: Record<string, string> = {
   name: 'f1_01',
   ssn: 'f1_02',
-  schedule_c_check: 'c1_1',
-  schedule_f_check: 'c1_2',
-  line_7_repaid_check: 'c1_3',
+  line_4_form_4797_check: 'c1_1',
+  line_4_form_4684_check: 'c1_2',
+  line_7_repaid_check: 'Line7_ReadOrder[0].c1_3',
   line_1: 'f1_04',
   line_2a: 'f1_05',
   line_3: 'f1_07',
@@ -216,8 +216,8 @@ export const SCHEDULE1_FIELDS: Record<string, string> = {
   line_19b: 'f2_10',
   line_19c: 'f2_11',
   line_24z_desc: 'f2_27',
-  line_14_check: 'c2_1',
-  line_19_check: 'c2_2'
+  line_14_storage_check: 'c2_1',
+  line_20_lived_apart_check: 'c2_2'
 }
 
 // IRS TY2025 PDF widget order, for legacy callers of fields().

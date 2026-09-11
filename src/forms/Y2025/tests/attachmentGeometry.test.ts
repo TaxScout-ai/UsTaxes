@@ -35,9 +35,14 @@ it('prints Schedule 1 income and deductions on the actual TY2025 labels', async 
   expect(read(2, '30')).toBe('2719') // total adjustments, line26
   expect(
     form.getCheckBox('topmostSubform[0].Page1[0].c1_1[0]').isChecked()
-  ).toBe(true)
+  ).toBe(false)
   expect(
     form.getCheckBox('topmostSubform[0].Page1[0].c1_2[0]').isChecked()
+  ).toBe(false)
+  expect(
+    form
+      .getCheckBox('topmostSubform[0].Page1[0].Line7_ReadOrder[0].c1_3[0]')
+      .isChecked()
   ).toBe(false)
 })
 
