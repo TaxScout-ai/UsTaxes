@@ -9,6 +9,11 @@ type Lines = Record<string, number | null>
  * Schedules 2 and 3, so a replay can rebuild lines 20 and 23 from their
  * sources the way it rebuilds line 9. A form the return does not carry is
  * `null`, never an empty object — absence is a fact of the return.
+ *
+ * v3 adds `worksheets` — the Social Security Benefits Worksheet behind line
+ * 6b and the Qualified Dividends and Capital Gain Tax Worksheet behind line
+ * 16, each `null` when the return does not use it — and `indicators` for the
+ * boxes the form prints beside those lines (Schedule D not required).
  */
 export function calculationSnapshot(f: F1040) {
   const lines: Lines = {
@@ -126,11 +131,84 @@ export function calculationSnapshot(f: F1040) {
       } as Lines
     }
   }
+  const ss = f.socialSecurityBenefitsWorksheet
+  const usesQdcg =
+    !f.scheduleD.taxWorksheet.isNeeded() &&
+    (f.scheduleD.computeTaxOnQDWorksheet() || f.totalQualifiedDividends() > 0)
+  const q = f.qualifiedAndCapGainsWorksheet
+  const worksheets = {
+    socialSecurityBenefits:
+      ss === undefined
+        ? null
+        : {
+            lines: {
+              '1': ss.l1(),
+              '2': ss.l2(),
+              '3': ss.l3(),
+              '4': ss.l4() ?? null,
+              '5': ss.l5(),
+              '6': ss.l6(),
+              '7': ss.l7(),
+              '8': ss.l8(),
+              '9': ss.l9(),
+              '10': ss.l10(),
+              '11': ss.l11(),
+              '12': ss.l12(),
+              '13': ss.l13(),
+              '14': ss.l14(),
+              '15': ss.l15(),
+              '16': ss.l16(),
+              '17': ss.l17(),
+              '18': ss.l18(),
+              taxable: ss.taxableAmount()
+            } as Lines
+          },
+    qualifiedDividendsCapitalGains: usesQdcg
+      ? {
+          lines: {
+            '1': q.l1(),
+            '2': q.l2(),
+            '3': q.l3(),
+            '4': q.l4(),
+            '5': q.l5(),
+            '6': q.l6(),
+            '7': q.l7(),
+            '8': q.l8(),
+            '9': q.l9(),
+            '10': q.l10(),
+            '11': q.l11(),
+            '12': q.l12(),
+            '13': q.l13(),
+            '14': q.l14(),
+            '15': q.l15(),
+            '16': q.l16(),
+            '17': q.l17(),
+            '18': q.l18(),
+            '19': q.l19(),
+            '20': q.l20(),
+            '21': q.l21(),
+            '22': q.l22(),
+            '23': q.l23(),
+            '24': q.l24(),
+            '25': q.l25()
+          } as Lines
+        }
+      : null
+  }
+  const indicators = {
+    /** Line 7 box: capital gain distributions only, Schedule D not required. */
+    scheduleDNotRequired: f.l7Box(),
+    /** Line 12d boxes as the standard deduction counts them. */
+    primary65OrOlder: f.bornBeforeDate(),
+    primaryBlind: f.blind()
+  }
   return {
-    schemaVersion: 'ustaxes-1040-line-snapshot-v2',
+    schemaVersion: 'ustaxes-1040-line-snapshot-v3',
     taxYear: 2025,
     form: '1040',
     lines,
-    attachments
+    attachments,
+    worksheets,
+    indicators
   }
 }
