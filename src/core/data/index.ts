@@ -819,6 +819,8 @@ export interface Form7206Data {
   healthInsurancePremiums: number
   /** Line 2: qualified long-term care premiums, already limited by age. */
   longTermCarePremiums: number
+  /** Schedule 1 line 16 amount attributable to this business, when multiple businesses exist. */
+  retirementContributions?: number
 }
 
 /** Schedule A (Form 8911): one qualified alternative fuel vehicle refueling property. */
@@ -851,6 +853,16 @@ export interface Form8911Data {
 }
 
 /** Schedule SE Part II: the taxpayer elects an optional method to figure net earnings. */
+export interface ScheduleCQbiData {
+  scheduleCIndex: number
+  businessIsQualified: boolean
+  hasOtherQbiAdjustments: boolean
+  cooperativePatron: boolean
+  /** Nonnegative loss magnitudes, including explicit zero. */
+  qualifiedLossCarryforward: number
+  reitPtpLossCarryforward: number
+}
+
 export interface ScheduleSEOptions {
   /** Farm optional method (lines 14–15): allowed when gross farm income is at or below the limit or net farm profit is below it. */
   farmOptionalMethod: boolean
@@ -1102,6 +1114,11 @@ export interface Form8880Data {
 // --- Schedule F (Profit or Loss from Farming) ---
 export interface ScheduleFData {
   farmName: string
+  activityCode?: string
+  materiallyParticipated?: boolean
+  paymentsRequiringForms1099?: boolean
+  forms1099Filed?: boolean
+  otherExpensesDescription?: string
   ein?: string
   accountingMethod: 'Cash' | 'Accrual'
   personRole: PersonRole.PRIMARY | PersonRole.SPOUSE
@@ -1446,6 +1463,7 @@ export interface Information<D = Date> {
   form7206s?: Form7206Data[]
   /** Form 8911 with one Schedule A per refueling property; the personal-use part → Schedule 3 line 6j. */
   form8911?: Form8911Data
+  scheduleCQbi?: ScheduleCQbiData
   form2555s?: Form2555Data[]
   form8582?: Form8582Data
   form4797?: Form4797Data

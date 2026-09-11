@@ -19,7 +19,11 @@ import F8889 from './F8889'
 import F8910 from './F8910'
 import F8936 from './F8936'
 import F8959 from './F8959'
-import F8995, { getF8995PhaseOutIncome } from './F8995'
+import F8995, {
+  getF8995PhaseOutIncome,
+  hasQbiSources,
+  validateScheduleCQbi
+} from './F8995'
 import F8995A from './F8995A'
 import Schedule1 from './Schedule1'
 import Schedule2 from './Schedule2'
@@ -35,7 +39,7 @@ import Form, { FormTag } from 'ustaxes/core/irsForms/Form'
 import { sumFields } from 'ustaxes/core/irsForms/util'
 import ScheduleB from './ScheduleB'
 import { computeOrdinaryTax } from './TaxTable'
-import { roundTaxTableResult, sumToWholeDollars } from './rounding'
+import { roundLine, roundTaxTableResult, sumToWholeDollars } from './rounding'
 import SDQualifiedAndCapGains from './worksheets/SDQualifiedAndCapGains'
 import QualifyingDependents from './worksheets/QualifyingDependents'
 import SocialSecurityBenefitsWorksheet from './worksheets/SocialSecurityBenefits'
@@ -350,11 +354,17 @@ export default class F1040 extends F1040Base {
       this.schedule1A = new Schedule1A(this)
     }
 
-    if (this.totalQbi() > 0) {
+    validateScheduleCQbi(this)
+    if (hasQbiSources(this)) {
       const formAMinAmount = getF8995PhaseOutIncome(
         this.info.taxPayer.filingStatus
       )
-      if (this.l11() - this.l12() >= formAMinAmount) {
+      if (
+        roundLine(this.l11()) -
+          roundLine(this.l12()) -
+          roundLine(this.l13b() ?? 0) >
+        formAMinAmount
+      ) {
         this.f8995 = new F8995A(this)
       } else {
         this.f8995 = new F8995(this)
