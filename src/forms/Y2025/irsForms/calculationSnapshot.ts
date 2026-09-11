@@ -14,7 +14,15 @@ type Lines = Record<string, number | null>
  * 6b and the Qualified Dividends and Capital Gain Tax Worksheet behind line
  * 16, each `null` when the return does not use it — and `indicators` for the
  * boxes the form prints beside those lines (Schedule D not required).
+ *
+ * v4 adds the income attachments behind lines 7, 8, 10 and 23: Schedule 1,
+ * Schedule D, Schedule E, Schedule F, Schedule SE and Form 4835 (the first
+ * copy of a form that may repeat). Yes/no lines are 1/0; an unanswered one is
+ * `null`.
  */
+const yesNo = (v: boolean | undefined): number | null =>
+  v === undefined ? null : v ? 1 : 0
+
 export function calculationSnapshot(f: F1040) {
   const lines: Lines = {
     '1a': f.l1a(),
@@ -129,7 +137,176 @@ export function calculationSnapshot(f: F1040) {
         '5': f.schedule3.l5(),
         '8': f.schedule3.l8()
       } as Lines
-    }
+    },
+    schedule1: !f.schedule1.isNeeded()
+      ? null
+      : {
+          lines: {
+            '1': f.schedule1.l1() ?? null,
+            '3': f.schedule1.l3() ?? null,
+            '5': f.schedule1.l5() ?? null,
+            '6': f.schedule1.l6() ?? null,
+            '7': f.schedule1.l7() ?? null,
+            '10': f.schedule1.l10(),
+            '15': f.schedule1.l15() ?? null,
+            '26': f.schedule1.l26()
+          } as Lines
+        },
+    scheduleD: !f.scheduleD.isNeeded()
+      ? null
+      : {
+          lines: {
+            '1ad': f.scheduleD.l1ad() ?? null,
+            '1ae': f.scheduleD.l1ae() ?? null,
+            '1ah': f.scheduleD.l1ah(),
+            '7': f.scheduleD.l7(),
+            '8ad': f.scheduleD.l8ad() ?? null,
+            '8ae': f.scheduleD.l8ae() ?? null,
+            '8ah': f.scheduleD.l8ah() ?? null,
+            '13': f.scheduleD.l13() ?? null,
+            '15': f.scheduleD.l15(),
+            '16': f.scheduleD.l16(),
+            '17': yesNo(f.scheduleD.l17()),
+            '18': f.scheduleD.l18() ?? null,
+            '19': f.scheduleD.l19() ?? null,
+            '20': yesNo(f.scheduleD.l20()),
+            '21': f.scheduleD.l21() ?? null,
+            '22': yesNo(f.scheduleD.l22())
+          } as Lines
+        },
+    scheduleE: !f.scheduleE.isNeeded()
+      ? null
+      : {
+          lines: {
+            '26': f.scheduleE.l26(),
+            '32': f.scheduleE.l32() ?? null,
+            '40': f.scheduleE.l40() ?? null,
+            '41': f.scheduleE.l41(),
+            '42': f.scheduleE.l42() ?? null
+          } as Lines
+        },
+    scheduleF:
+      f.scheduleF === undefined
+        ? null
+        : {
+            lines: {
+              '1a': f.scheduleF.l1a(),
+              '1b': f.scheduleF.l1b(),
+              '1c': f.scheduleF.l1c(),
+              '2': f.scheduleF.l2(),
+              '3a': f.scheduleF.l3a(),
+              '4a': f.scheduleF.l4a(),
+              '5a': f.scheduleF.l5a(),
+              '6': f.scheduleF.l6(),
+              '7': f.scheduleF.l7(),
+              '8': f.scheduleF.l8(),
+              '9': f.scheduleF.l9(),
+              '10': f.scheduleF.l10(),
+              '11': f.scheduleF.l11(),
+              '12': f.scheduleF.l12(),
+              '13': f.scheduleF.l13(),
+              '14': f.scheduleF.l14(),
+              '15': f.scheduleF.l15(),
+              '16': f.scheduleF.l16(),
+              '17': f.scheduleF.l17(),
+              '18': f.scheduleF.l18(),
+              '19': f.scheduleF.l19(),
+              '20': f.scheduleF.l20(),
+              '21a': f.scheduleF.l21a(),
+              '21b': f.scheduleF.l21b(),
+              '22': f.scheduleF.l22(),
+              '23': f.scheduleF.l23(),
+              '24a': f.scheduleF.l24a(),
+              '24b': f.scheduleF.l24b(),
+              '25': f.scheduleF.l25(),
+              '26': f.scheduleF.l26(),
+              '27': f.scheduleF.l27(),
+              '28': f.scheduleF.l28(),
+              '29': f.scheduleF.l29(),
+              '30': f.scheduleF.l30(),
+              '31': f.scheduleF.l31(),
+              '32': f.scheduleF.l32(),
+              '33': f.scheduleF.l33(),
+              '34': f.scheduleF.l34()
+            } as Lines
+          },
+    scheduleSE: !f.scheduleSE.isNeeded()
+      ? null
+      : {
+          lines: {
+            '1a': f.scheduleSE.l1a() ?? null,
+            '1b': f.scheduleSE.l1b(),
+            '2': f.scheduleSE.l2(),
+            '3': f.scheduleSE.l3(),
+            '4a': f.scheduleSE.l4a(),
+            '4b': f.scheduleSE.l4b() ?? null,
+            '4c': f.scheduleSE.l4c(),
+            '5a': f.scheduleSE.l5a() ?? null,
+            '5b': f.scheduleSE.l5b() ?? null,
+            '6': f.scheduleSE.l6() ?? null,
+            '7': f.scheduleSE.l7(),
+            '8a': f.scheduleSE.l8a() ?? null,
+            '8d': f.scheduleSE.l8d() ?? null,
+            '9': f.scheduleSE.l9() ?? null,
+            '10': f.scheduleSE.l10() ?? null,
+            '11': f.scheduleSE.l11() ?? null,
+            '12': f.scheduleSE.l12() ?? null,
+            '13': f.scheduleSE.l13() ?? null,
+            '14': f.scheduleSE.l14() ?? null,
+            '15': f.scheduleSE.l15() ?? null
+          } as Lines
+        },
+    f4835:
+      f.f4835s().length === 0
+        ? null
+        : (() => {
+            const [r] = f.f4835s()
+            return {
+              lines: {
+                '1': r.l1(),
+                '2a': r.l2a(),
+                '2b': r.l2b(),
+                '3a': r.l3a(),
+                '3b': r.l3b(),
+                '4a': r.l4a(),
+                '4b': r.l4b(),
+                '4c': r.l4c(),
+                '5a': r.l5a(),
+                '5b': r.l5b(),
+                '5d': r.l5d(),
+                '6': r.l6(),
+                '7': r.l7(),
+                '8': r.l8(),
+                '9': r.l9(),
+                '10': r.l10(),
+                '11': r.l11(),
+                '12': r.l12(),
+                '13': r.l13(),
+                '14': r.l14(),
+                '15': r.l15(),
+                '16': r.l16(),
+                '17': r.l17(),
+                '18': r.l18(),
+                '19a': r.l19a(),
+                '19b': r.l19b(),
+                '20': r.l20(),
+                '21': r.l21(),
+                '22a': r.l22a(),
+                '22b': r.l22b(),
+                '23': r.l23(),
+                '24': r.l24(),
+                '25': r.l25(),
+                '26': r.l26(),
+                '27': r.l27(),
+                '28': r.l28(),
+                '29': r.l29(),
+                '30': r.l30(),
+                '31': r.l31(),
+                '32': r.l32(),
+                '34c': r.l34c() ?? null
+              } as Lines
+            }
+          })()
   }
   const ss = f.socialSecurityBenefitsWorksheet
   const usesQdcg =
@@ -203,7 +380,7 @@ export function calculationSnapshot(f: F1040) {
     primaryBlind: f.blind()
   }
   return {
-    schemaVersion: 'ustaxes-1040-line-snapshot-v3',
+    schemaVersion: 'ustaxes-1040-line-snapshot-v4',
     taxYear: 2025,
     form: '1040',
     lines,

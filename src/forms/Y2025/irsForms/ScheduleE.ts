@@ -42,7 +42,8 @@ export default class ScheduleE extends F1040Attachment {
 
   isNeeded = (): boolean =>
     this.f1040.info.realEstate.length > 0 ||
-    this.f1040.info.scheduleK1Form1065s.length > 0
+    this.f1040.info.scheduleK1Form1065s.length > 0 ||
+    this.f1040.f4835s().length > 0
 
   addressString = (address: Address): string =>
     [
@@ -202,11 +203,20 @@ export default class ScheduleE extends F1040Attachment {
   // TODO: REMICS income or loss
   l39 = (): number | undefined => undefined
 
-  // TODO: Farm rental income or loss
-  l40 = (): number | undefined => undefined
+  /** Line 40: net farm rental income or loss from Form(s) 4835. */
+  l40 = (): number | undefined =>
+    this.f1040.f4835s().length === 0
+      ? undefined
+      : sumFields(this.f1040.f4835s().map((f) => f.toScheduleE40()))
 
   l41 = (): number =>
     sumFields([this.l26(), this.l32(), this.l37(), this.l39(), this.l40()])
+
+  /** Line 42: reconciliation of farming and fishing income — Form 4835 line 7 (K-1 sources not implemented). */
+  l42 = (): number | undefined =>
+    this.f1040.f4835s().length === 0
+      ? undefined
+      : sumFields(this.f1040.f4835s().map((f) => f.l7()))
 
   fields = (): Field[] => {
     const [p0, p1, p2] = [0, 1, 2].map((i) => this.propForRow(i))
@@ -329,8 +339,8 @@ export default class ScheduleE extends F1040Attachment {
       this.l39(), // l39
       this.l40(), // l40
       this.l41(), // l41
-      undefined,
-      undefined
+      this.l42(), // l42
+      undefined // l43
     ]
   }
 }

@@ -760,6 +760,62 @@ export interface Form4562Data {
   amortizationCosts?: AmortizationCosts[] // Line 42
 }
 
+// --- Form 4835 (Farm Rental Income and Expenses) ---
+/** One Form 4835: a landowner's share-rental farm income, reported on Schedule E line 40 and not subject to SE tax. */
+export interface F4835Data {
+  personRole: PersonRole.PRIMARY | PersonRole.SPOUSE
+  ein?: string
+  /** Line A: actively participated in the operation of the farm. */
+  activelyParticipated: boolean
+  // Part I — gross farm rental income (based on production)
+  productionIncome: number // Line 1
+  cooperativeDistributions: number // Line 2a
+  cooperativeDistributionsTaxable: number // Line 2b
+  agriculturePayments: number // Line 3a
+  agriculturePaymentsTaxable: number // Line 3b
+  cccLoansReportedUnderElection: number // Line 4a
+  cccLoansForfeited: number // Line 4b
+  cccLoansForfeitedTaxable: number // Line 4c
+  cropInsuranceProceeds: number // Line 5a
+  cropInsuranceProceedsTaxable: number // Line 5b
+  cropInsuranceDeferredFromPriorYear: number // Line 5d
+  otherIncome: number // Line 6
+  // Part II — expenses
+  carAndTruck: number // Line 8
+  chemicals: number // Line 9
+  conservation: number // Line 10
+  customHire: number // Line 11
+  depreciation: number // Line 12
+  employeeBenefits: number // Line 13
+  feed: number // Line 14
+  fertilizers: number // Line 15
+  freight: number // Line 16
+  fuel: number // Line 17
+  insurance: number // Line 18
+  interestMortgage: number // Line 19a
+  interestOther: number // Line 19b
+  labor: number // Line 20
+  pensionProfitSharing: number // Line 21
+  rentVehicles: number // Line 22a
+  rentOther: number // Line 22b
+  repairs: number // Line 23
+  seeds: number // Line 24
+  storage: number // Line 25
+  supplies: number // Line 26
+  taxes: number // Line 27
+  utilities: number // Line 28
+  veterinary: number // Line 29
+  otherExpenses: Array<{ description: string; amount: number }> // Line 30a–30g
+  /** Line 34a: all investment is at risk (a loss is deductible in full). */
+  allInvestmentAtRisk: boolean
+}
+
+/** Schedule SE Part II: the taxpayer elects an optional method to figure net earnings. */
+export interface ScheduleSEOptions {
+  /** Farm optional method (lines 14–15): allowed when gross farm income is at or below the limit or net farm profit is below it. */
+  farmOptionalMethod: boolean
+}
+
 // --- Schedule F (Profit or Loss From Farming) ---
 export enum ScheduleFAccountingMethod {
   Cash = 'Cash',
@@ -1342,6 +1398,10 @@ export interface Information<D = Date> {
   form8880?: Form8880Data
   form4562s?: Form4562Data[]
   scheduleFData?: ScheduleFData[]
+  /** Form 4835 farm rental income and expenses (crop/livestock shares, not subject to SE tax); net → Schedule E line 40. */
+  f4835s?: F4835Data[]
+  /** Schedule SE Part II elections; absent means the regular method. */
+  scheduleSEOptions?: ScheduleSEOptions
   form2555s?: Form2555Data[]
   form8582?: Form8582Data
   form4797?: Form4797Data

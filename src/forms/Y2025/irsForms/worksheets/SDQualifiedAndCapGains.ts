@@ -73,16 +73,16 @@ export default class QualDivAndCGWorksheet extends Worksheet {
   l16 = (): number => Math.max(this.l14() - this.l15(), 0)
   // 17. Enter the smaller of line 12 or line 16
   l17 = (): number => Math.min(this.l12(), this.l16())
-  // 18. Multiply line 17 by 15% (0.15)
+  // 18. Multiply line 17 by 15% (0.15) — a form line, so whole dollars.
   l18 = (): number =>
-    (this.l17() * federalBrackets.longTermCapGains.rates[1]) / 100
+    Math.round((this.l17() * federalBrackets.longTermCapGains.rates[1]) / 100)
   // 19. Add lines 9 and 17
   l19 = (): number => this.l9() + this.l17()
   // 20. Subtract line 19 from line 10
   l20 = (): number => this.l10() - this.l19()
-  // 21. Multiply line 20 by 20% (0.20)
+  // 21. Multiply line 20 by 20% (0.20) — a form line, so whole dollars.
   l21 = (): number =>
-    (this.l20() * federalBrackets.longTermCapGains.rates[2]) / 100
+    Math.round((this.l20() * federalBrackets.longTermCapGains.rates[2]) / 100)
   // 22. Figure the tax on the amount on line 5. If the amount on line 5 is less than $100,000, use the Tax Table to figure the tax. If the amount on line 5 is $100,000 or more, use the Tax Computation Worksheet
   l22 = (): number =>
     computeOrdinaryTax(this.f1040.info.taxPayer.filingStatus, this.l5())

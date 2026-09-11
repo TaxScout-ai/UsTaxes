@@ -67,6 +67,7 @@ import F8582 from './F8582'
 import F8829 from './F8829'
 import F8880 from './F8880'
 import ScheduleF from './ScheduleF'
+import F4835 from './F4835'
 import F4562 from './F4562'
 import F8801 from './F8801'
 import Schedule1A from './Schedule1A'
@@ -92,6 +93,7 @@ export default class F1040 extends F1040Base {
   scheduleSE: ScheduleSE
   scheduleEIC: ScheduleEIC
   scheduleF?: ScheduleF
+  _f4835List?: F4835[]
   _scheduleFList?: ScheduleF[]
   scheduleR?: ScheduleR
   schedule8812: Schedule8812
@@ -177,6 +179,11 @@ export default class F1040 extends F1040Base {
         (data) => new ScheduleF(this, data)
       )
       this.scheduleF = this._scheduleFList[0]
+    }
+
+    // Form 4835 per farm rental; Schedule E line 40 sums them.
+    if (this.info.f4835s !== undefined && this.info.f4835s.length > 0) {
+      this._f4835List = this.info.f4835s.map((data) => new F4835(this, data))
     }
 
     // Create Form 8880 for saver's credit
@@ -401,6 +408,12 @@ export default class F1040 extends F1040Base {
       0
     )
 
+  /** Gross farm income (Schedule F line 9) across all Schedules F — the farm optional method's base. */
+  scheduleFGrossIncome = (): number =>
+    (this._scheduleFList ?? []).reduce((sum, sf) => sum + sf.l9(), 0)
+
+  f4835s = (): F4835[] => this._f4835List ?? []
+
   // Total foreign tax credit across all categories
   totalForeignTaxCredit = (): number =>
     (this._f1116List ?? []).reduce((sum, f) => sum + f.l24(), 0)
@@ -423,6 +436,7 @@ export default class F1040 extends F1040Base {
       this.scheduleE,
       this.scheduleSE,
       this.scheduleF,
+      ...this.f4835s(),
       this.scheduleR,
       this.scheduleEIC,
       this.schedule8812,
