@@ -65,9 +65,9 @@ export default class Schedule1 extends F1040Attachment {
     )
     return unemployment > 0 ? unemployment : undefined
   }
-  // Line 8a: Prizes, awards, gambling winnings
-  l8a = (): number | undefined => this.f1040.info.gamblingIncome ?? undefined
-  l8b = (): number | undefined => undefined
+  // TY2025 line 8a is reserved for a net operating loss; gambling is line 8b.
+  l8a = (): number | undefined => undefined
+  l8b = (): number | undefined => this.f1040.info.gamblingIncome ?? undefined
   // Line 8c: Cancellation of debt
   l8c = (): number | undefined =>
     this.f1040.info.cancellationOfDebtIncome ?? undefined
@@ -85,23 +85,23 @@ export default class Schedule1 extends F1040Attachment {
   l8k = (): number | undefined => undefined
   l8l = (): number | undefined => undefined
   l8m = (): number | undefined => undefined
-  l8n = (): number | undefined => {
-    const income = this.f1040.f8814TotalIncome()
-    return income > 0 ? income : undefined
-  }
+  // Form 8814 income is reported in line 8z with its source description; line
+  // 8n is reserved for section 951(a) inclusions in the TY2025 form.
+  l8n = (): number | undefined => undefined
   l8o = (): number | undefined => undefined
-  // Line 8p: 529/ABLE plan distributions
-  l8p = (): number | undefined =>
-    this.f1040.info.section529Distributions ?? undefined
-  // Line 8q: Scholarship/fellowship income not on W-2
-  l8q = (): number | undefined => this.f1040.info.scholarshipIncome ?? undefined
-  l8r = (): number | undefined => undefined
+  // Line 8p: section 461(l) excess business loss adjustment (not admitted yet)
+  l8p = (): number | undefined => undefined
+  l8q = (): number | undefined => undefined
+  // Line 8r: Scholarship/fellowship income not on W-2
+  l8r = (): number | undefined => this.f1040.info.scholarshipIncome ?? undefined
   l8s = (): number | undefined => undefined
   l8t = (): number | undefined => undefined
   l8u = (): number | undefined => undefined
   l8v = (): number | undefined => undefined
 
   l8z = (): number => {
+    const form8814Income = this.f1040.f8814TotalIncome()
+    if (form8814Income > 0) this.otherIncomeStrings.add('Form 8814')
     if (
       (this.f1040.f8889.isNeeded() && this.f1040.f8889.l20() > 0) ||
       ((this.f1040.f8889Spouse?.isNeeded() ?? false) &&
@@ -111,7 +111,11 @@ export default class Schedule1 extends F1040Attachment {
       this.otherIncomeStrings.add('HSA')
     }
 
-    return sumFields([this.f1040.f8889.l20(), this.f1040.f8889Spouse?.l20()])
+    return sumFields([
+      this.f1040.f8889.l20(),
+      this.f1040.f8889Spouse?.l20(),
+      form8814Income
+    ])
   }
 
   l9 = (): number =>
@@ -286,8 +290,9 @@ export default class Schedule1 extends F1040Attachment {
     set('line_8t', this.l8t())
     set('line_8u', this.l8u())
     set('line_8v', this.l8v())
-    set('line_8z_desc', Array.from(this.otherIncomeStrings).join(' '))
     set('line_8z', this.l8z())
+    // l8z discovers source labels (HSA, Form 8814) while computing its amount.
+    set('line_8z_desc', Array.from(this.otherIncomeStrings).join(' '))
     set('line_9', this.l9())
     set('line_10', this.l10())
     // Page 2 — Adjustments to Income

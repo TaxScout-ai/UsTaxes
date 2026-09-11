@@ -74,3 +74,17 @@ it('prints Schedule F totals in amount controls, with activity code and explicit
   expect(form.getCheckBox(root + 'c1_4[0]').isChecked()).toBe(false)
   expect(form.getCheckBox(root + 'c1_4[1]').isChecked()).toBe(true)
 })
+
+it('keeps TY2025 Schedule 1 other-income labels aligned with their meanings', async () => {
+  const info = scenarioTwelveInformation()
+  info.gamblingIncome = 100
+  info.scholarshipIncome = 200
+  const f = new F1040(info, []).schedule1
+  const form = await printed(f.tag, f.namedFields())
+  const read = (n: string) =>
+    form.getTextField(`topmostSubform[0].Page1[0].f1_${n}[0]`).getText() ?? ''
+  expect(read('13')).toBe('') // line 8a, net operating loss
+  expect(read('14')).toBe('100') // line 8b, gambling
+  expect(read('26')).toBe('') // line 8n, section 951(a) inclusion
+  expect(read('30')).toBe('200') // line 8r, scholarship
+})
