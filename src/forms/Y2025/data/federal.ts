@@ -97,11 +97,11 @@ const federalBrackets: FederalBrackets = {
           },
           {
             name: 'Standard Deduction (Widowed) with 1 age or blindness allowance',
-            amount: 31600
+            amount: 33100
           },
           {
             name: 'Standard Deduction (Widowed) with 2 age or blindness allowances',
-            amount: 33200
+            amount: 34700
           }
         ],
         exemptions: [
@@ -120,19 +120,19 @@ const federalBrackets: FederalBrackets = {
           },
           {
             name: 'Standard Deduction (Married Filing Separately) with 1 age or blindness allowance',
-            amount: 16600
+            amount: 17350
           },
           {
             name: 'Standard Deduction (Married Filing Separately) with 2 age or blindness allowances',
-            amount: 18200
+            amount: 18950
           },
           {
             name: 'Standard Deduction (Married Filing Separately) with 3 age or blindness allowances',
-            amount: 19800
+            amount: 20550
           },
           {
             name: 'Standard Deduction (Married Filing Separately) with 4 age or blindness allowances',
-            amount: 21400
+            amount: 22150
           }
         ],
         exemptions: [
@@ -147,15 +147,15 @@ const federalBrackets: FederalBrackets = {
         deductions: [
           {
             name: 'Standard Deduction (Head of Household)',
-            amount: 22500
+            amount: 23625
           },
           {
             name: 'Standard Deduction (Head of Household) with 1 age or blindness allowance',
-            amount: 24500
+            amount: 25625
           },
           {
             name: 'Standard Deduction (Head of Household) with 2 age or blindness allowances',
-            amount: 26500
+            amount: 27625
           }
         ],
         exemptions: [
@@ -180,7 +180,7 @@ const federalBrackets: FederalBrackets = {
         brackets: [96700, 600050]
       },
       [FilingStatus.MFS]: {
-        brackets: [48350, 300025]
+        brackets: [48350, 300000]
       },
       [FilingStatus.HOH]: {
         brackets: [64750, 566700]
