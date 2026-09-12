@@ -49,7 +49,8 @@ export default class F6251 extends F1040Attachment {
       return true
     }
 
-    // TODO: 2. You claim any general business credit, and either line 6 (in Part I) of Form 3800 or line 25 of Form 3800 is more than zero.
+    // 2. You claim any general business credit, and either line 6 (in Part I) of Form 3800 or line 25 of Form 3800 is more than zero.
+    if ((this.f1040.f3800?.l6() ?? 0) > 0) return true
 
     if ((this.f1040.f8801?.credit() ?? 0) > 0) return true
 

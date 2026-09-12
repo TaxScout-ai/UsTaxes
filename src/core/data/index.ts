@@ -1037,6 +1037,118 @@ export interface Form8862Student {
   claimedFourPriorYears: boolean
 }
 
+// --- Form 8835 (Renewable Electricity Production Credit) ---
+export type Form8835ElectricitySource =
+  | 'wind'
+  | 'closedLoopBiomass'
+  | 'geothermal'
+  | 'solar'
+  | 'offshoreWind'
+  | 'openLoopBiomass'
+  | 'landfillGas'
+  | 'trash'
+  | 'hydropower'
+  | 'marineHydrokinetic'
+
+/** Line 2b: the facility owner when it is not the filer. */
+export interface Form8835FacilityOwner {
+  businessName?: string
+  personName?: string
+  /** Line 2b(ii): the owner's TIN. */
+  tin: string
+}
+
+export interface Form8835Data {
+  /** Line 1: the IRS-issued registration number for an elective payment or transfer election. */
+  registrationNumber?: string
+  /** Line 2a: the type of facility, as the form asks for it. */
+  facilityTypeDescription: string
+  owner?: Form8835FacilityOwner
+  /** Line 3a. */
+  facilityAddress?: Address
+  /** Line 3b: signed decimal degrees, e.g. "+24.778212" and "-103.743636". */
+  latitude?: string
+  longitude?: string
+  /** Lines 4 and 5, YYYY-MM-DD. Only facilities placed in service after 2021 are carried (the form's rates). */
+  constructionStartDate: string
+  placedInServiceDate: string
+  /** Line 6. */
+  expansionOfBiomassFacility: boolean
+  /** Lines 8a–8c; none of them is line 8d. */
+  netOutputUnder1MW: boolean
+  constructionBeganBefore2023Jan29: boolean
+  meetsWageAndApprenticeshipRequirements: boolean
+  /** Line 9: 9a when true, 9b otherwise. */
+  domesticContentBonus: boolean
+  /** Line 10. */
+  energyCommunityBonus: 'yes' | 'no' | 'not_applicable'
+  /** Line 11a in kW; absent = 11b. */
+  nameplateCapacityDcKw?: number
+  /** Line 12 in kW; all absent = 12d. */
+  nameplateCapacityAcKw?: { solar?: number; wind?: number; other?: number }
+  /** Part II line 1 column (a): kilowatt-hours produced and sold, by source. */
+  kilowattHoursSold: Partial<Record<Form8835ElectricitySource, number>>
+  /** Line 3: the phaseout adjustment in dollars (zero unless the reference price rule applies). */
+  phaseoutAdjustment?: number
+  /** Line 5a: the tax-exempt bond financing ratio (0–1) when bond proceeds financed the facility. */
+  taxExemptBondRatio?: number
+  /** Line 14. */
+  creditFromPassThroughs?: number
+  /** The credit was bought under a section 6418 transfer election: Form 3800 Part III column (f). */
+  purchasedUnderTransferElection?: boolean
+}
+
+// --- Form 3800 (General Business Credit) ---
+/** Part III columns (b) and (c) for a current-year credit line, as the return states them. */
+export interface Form3800LineDetail {
+  line: '1f' | '1y'
+  /** Column (b): the elective payment or transfer registration number. */
+  registrationNumber?: string
+  /** Column (c): the pass-through or transferor entity EIN, or "APPLD FOR" when applied for. */
+  entityEin?: string
+  entityEinAppliedFor?: boolean
+}
+
+export interface Form3800Data {
+  /** Line B(ii): transfer election statements attached; defaults to the purchased credits. */
+  transferElectionStatementCount?: number
+  lineDetails?: Form3800LineDetail[]
+}
+
+// --- Form 8936 (Clean Vehicle Credits) with Schedule A ---
+export interface Form8936VehicleData {
+  /** Schedule A lines 1a–1c. */
+  year: number
+  make: string
+  model: string
+  /** Line 2. */
+  vin: string
+  /** Line 3, YYYY-MM-DD. */
+  placedInServiceDate: string
+  /** Line 4a: the credit was transferred to the dealer at the time of sale (not carried). */
+  transferredToDealer: boolean
+  /** Lines 5–7: only a new clean vehicle (Part II/III) is carried. */
+  kind: 'new' | 'previouslyOwned' | 'commercial'
+  /** Line 8a. */
+  resoldWithin30Days: boolean
+  /** Line 8e. */
+  acquiredForUseNotResale: boolean
+  /** Line 9: the tentative credit amount from the seller's report. */
+  tentativeCredit: number
+  /** Line 10: business/investment use as a fraction 0–1. */
+  businessUseFraction: number
+}
+
+export interface Form8936Data {
+  vehicles: Form8936VehicleData[]
+  /** Line 3a: the prior-year modified AGI (line 11 of the 2024 return). */
+  priorYearAgi: number
+  /** Line 5: the 2024 filing status. */
+  priorYearFilingStatus: FilingStatus
+  /** Line 7. */
+  creditFromPassThroughs?: number
+}
+
 export interface Form8862Data {
   /** Line 1 */
   taxYear: number
@@ -1604,6 +1716,11 @@ export interface Information<D = Date> {
   form3903?: Form3903Data
   /** Form 8862: information only, attached when a credit is claimed after a disallowance. */
   form8862?: Form8862Data
+  /** Form 3800 with its credit forms: Schedule 3 line 6a. */
+  form3800?: Form3800Data
+  form8835?: Form8835Data
+  /** Form 8936 with a Schedule A per vehicle: Form 3800 line 1y and Schedule 3 line 6f. */
+  form8936?: Form8936Data
   form8962?: Form8962Data
   form8814s?: Form8814Data[]
   scheduleRData?: ScheduleRData

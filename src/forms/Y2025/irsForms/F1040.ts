@@ -76,6 +76,8 @@ import ScheduleF from './ScheduleF'
 import F4835 from './F4835'
 import F7206 from './F7206'
 import F8911 from './F8911'
+import F3800 from './F3800'
+import F8835 from './F8835'
 import F4562 from './F4562'
 import F8801 from './F8801'
 import Schedule1A from './Schedule1A'
@@ -122,6 +124,8 @@ export default class F1040 extends F1040Base {
   scheduleH?: ScheduleH
   f6251: F6251
   f8911?: F8911
+  f3800?: F3800
+  f8835?: F8835
   f8606?: F8606
   _f8606List?: F8606[]
   f8283?: F8283
@@ -283,6 +287,17 @@ export default class F1040 extends F1040Base {
     // Form 8911 with a Schedule A per refueling property; Schedule 3 line 6j.
     if (this.info.form8911 !== undefined) {
       this.f8911 = new F8911(this, this.info.form8911)
+    }
+    // Form 8835 and the business-use part of Form 8936 are general business
+    // credits: Form 3800 carries them to Schedule 3 line 6a.
+    if (this.info.form8835 !== undefined) {
+      this.f8835 = new F8835(this, this.info.form8835)
+    }
+    if (this.info.form8936 !== undefined) {
+      this.f8936 = new F8936(this, this.info.form8936)
+    }
+    if (this.f8835 !== undefined || this.f8936 !== undefined) {
+      this.f3800 = new F3800(this, this.info.form3800)
     }
 
     // Create Form 4137 for unreported tip income
@@ -505,6 +520,8 @@ export default class F1040 extends F1040Base {
       this.f6251,
       this.f8911,
       ...(this.f8911?.schedules ?? []),
+      this.f3800,
+      this.f8835,
       this.f8582,
       this.f8814,
       this.f8888,
@@ -513,6 +530,7 @@ export default class F1040 extends F1040Base {
       this.f8910,
       this.f8919,
       this.f8936,
+      ...(this.f8936?.schedules ?? []),
       this.f8949,
       this.f8959,
       this.f8960,
