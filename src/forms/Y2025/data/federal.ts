@@ -294,68 +294,104 @@ const toPieceWise = (points: Point[]): Piecewise =>
       f: linear((y2 - y1) / (x2 - x1), y1 - (x1 * (y2 - y1)) / (x2 - x1))
     }))
 
-// These points are taken directly from IRS publication
-// IRS Rev. Proc. 2024-40 for tax year 2025
-// https://www.irs.gov/pub/irs-drop/rp-24-40.pdf
-const unmarriedFormulas: Piecewise[] = (() => {
-  const points: Point[][] = [
-    [
-      [0, 0],
-      [8490, 649],
-      [10620, 649],
-      [19104, 0]
-    ], // 0
-    [
-      [0, 0],
-      [12730, 4328],
-      [23350, 4328],
-      [50434, 0]
-    ], // 1
-    [
-      [0, 0],
-      [17880, 7152],
-      [23350, 7152],
-      [57310, 0]
-    ], // 2
-    [
-      [0, 0],
-      [17880, 8046],
-      [23350, 8046],
-      [61555, 0]
-    ] // 3 or more
-  ]
-  return points.map((ps: Point[]) => toPieceWise(ps))
-})()
+/**
+ * IRS Rev. Proc. 2024-40 §2.06, tax year 2025: the EIC parameters by number of
+ * qualifying children (0, 1, 2, 3 or more). The published EIC Table (2025
+ * Instructions for Form 1040) is generated from these: each $50 band is
+ * figured at its midpoint with the phase-in rate up to the maximum credit,
+ * then the phase-out rate from the phase-out threshold, rounded to the
+ * nearest dollar; the band that straddles the point where the maximum is
+ * reached, and the band that straddles the phase-out threshold, carry the
+ * maximum. Both facts are verified against every row of the table in
+ * ScheduleEIC.test.ts.
+ */
+export interface EICParameters {
+  /** Phase-in rate in hundredths of a percent (7.65% = 765). */
+  phaseInRateBps: number
+  maxCredit: number
+  /** Earned income at which the maximum credit is reached. */
+  phaseInEnd: number
+  /** Phase-out threshold (unmarried / joint). */
+  phaseOutStart: number
+  phaseOutStartMfj: number
+  /** Phase-out rate in hundredths of a percent (21.06% = 2106). */
+  phaseOutRateBps: number
+}
 
-const marriedFormulas: Piecewise[] = (() => {
-  const points: Point[][] = [
-    [
+export const eicParameters: EICParameters[] = [
+  {
+    phaseInRateBps: 765,
+    maxCredit: 649,
+    phaseInEnd: 8490,
+    phaseOutStart: 10620,
+    phaseOutStartMfj: 17730,
+    phaseOutRateBps: 765
+  },
+  {
+    phaseInRateBps: 3400,
+    maxCredit: 4328,
+    phaseInEnd: 12730,
+    phaseOutStart: 23350,
+    phaseOutStartMfj: 30470,
+    phaseOutRateBps: 1598
+  },
+  {
+    phaseInRateBps: 4000,
+    maxCredit: 7152,
+    phaseInEnd: 17880,
+    phaseOutStart: 23350,
+    phaseOutStartMfj: 30470,
+    phaseOutRateBps: 2106
+  },
+  {
+    phaseInRateBps: 4500,
+    maxCredit: 8046,
+    phaseInEnd: 17880,
+    phaseOutStart: 23350,
+    phaseOutStartMfj: 30470,
+    phaseOutRateBps: 2106
+  }
+]
+
+/**
+ * The credit the EIC Table shows for the $50 band containing `income`.
+ * `married` selects the joint phase-out threshold.
+ */
+export const eicTableCredit = (
+  income: number,
+  children: number,
+  married: boolean
+): number => {
+  if (income < 1) return 0
+  const p = eicParameters[Math.min(children, eicParameters.length - 1)]
+  const bandStart = Math.floor(Math.round(income) / 50) * 50
+  const bandEnd = bandStart + 50
+  const midpoint = bandStart + 25
+  const phaseOutStart = married ? p.phaseOutStartMfj : p.phaseOutStart
+  // A band that reaches the plateau on either side carries the maximum.
+  if (bandEnd > p.phaseInEnd && bandStart < phaseOutStart) return p.maxCredit
+  const credit =
+    midpoint <= p.phaseInEnd
+      ? Math.min((p.phaseInRateBps * midpoint) / 10000, p.maxCredit)
+      : p.maxCredit - (p.phaseOutRateBps * (midpoint - phaseOutStart)) / 10000
+  return Math.max(0, Math.floor(credit + 0.5))
+}
+
+const eicPoints = (married: boolean): Point[][] =>
+  eicParameters.map((p) => {
+    const start = married ? p.phaseOutStartMfj : p.phaseOutStart
+    const end = start + Math.ceil((p.maxCredit * 10000) / p.phaseOutRateBps)
+    return [
       [0, 0],
-      [8490, 649],
-      [17730, 649],
-      [26214, 0]
-    ], // 0
-    [
-      [0, 0],
-      [12730, 4328],
-      [30470, 4328],
-      [57554, 0]
-    ], // 1
-    [
-      [0, 0],
-      [17880, 7152],
-      [30470, 7152],
-      [64430, 0]
-    ], // 2
-    [
-      [0, 0],
-      [17880, 8046],
-      [30470, 8046],
-      [68675, 0]
-    ] // 3 or more
-  ]
-  return points.map((ps) => toPieceWise(ps))
-})()
+      [p.phaseInEnd, p.maxCredit],
+      [start, p.maxCredit],
+      [end, 0]
+    ]
+  })
+
+/** The same parameters as linear segments (kept for the property tests). */
+const unmarriedFormulas: Piecewise[] = eicPoints(false).map(toPieceWise)
+const marriedFormulas: Piecewise[] = eicPoints(true).map(toPieceWise)
 
 interface EICDef {
   caps: { [k in FilingStatus]: number[] | undefined }

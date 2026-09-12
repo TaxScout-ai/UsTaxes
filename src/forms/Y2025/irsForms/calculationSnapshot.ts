@@ -33,6 +33,13 @@ type Lines = Record<string, number | null>
  * (count and totals), Schedule C Part IV miles (44a–44c), and indicators for
  * the statutory-employee box, the itemize election, a deceased spouse, the
  * nonresident-alien-spouse election and the line 27c EIC decline.
+ *
+ * v8 adds the refundable-credit chain behind lines 27a–29: Schedule EIC (the
+ * credit as the EIC Table gives it, on earned income and on AGI), Form 2441
+ * (2025 lines 3–11, line 8 the whole percent), Form 8863 (Parts I–II and
+ * the first student's Part III, line 6 in thousandths), Schedule 8812 Part
+ * II-A, Form 3903 (Schedule 1 line 14), Form 8862 (the Part I boxes),
+ * Schedule 3 lines 1–4, and the line 28 ACTC opt-out among the indicators.
  */
 const yesNo = (v: boolean | undefined): number | null =>
   v === undefined ? null : v ? 1 : 0
@@ -146,6 +153,10 @@ export function calculationSnapshot(f: F1040) {
     },
     schedule3: {
       lines: {
+        '1': f.schedule3.l1() ?? null,
+        '2': f.schedule3.l2() ?? null,
+        '3': f.schedule3.l3() ?? null,
+        '4': f.schedule3.l4() ?? null,
         '5a': f.schedule3.l5a() ?? null,
         '5b': f.schedule3.l5b() ?? null,
         '5': f.schedule3.l5(),
@@ -229,6 +240,7 @@ export function calculationSnapshot(f: F1040) {
             '6': f.schedule1.l6() ?? null,
             '7': f.schedule1.l7() ?? null,
             '10': f.schedule1.l10(),
+            '14': f.schedule1.l14() ?? null,
             '15': f.schedule1.l15() ?? null,
             '16': f.schedule1.l16() ?? null,
             '17': f.schedule1.l17() ?? null,
@@ -435,9 +447,110 @@ export function calculationSnapshot(f: F1040) {
             '11': f.schedule8812.l11(),
             '12': f.schedule8812.l12(),
             '13': f.schedule8812.l13(),
-            '14': f.schedule8812.l14()
+            '14': f.schedule8812.l14(),
+            ...(() => {
+              const a = f.schedule8812.part2a()
+              return {
+                '16a': a.l16a ?? null,
+                '16b': a.l16b ?? null,
+                '17': a.l17 ?? null,
+                '18a': a.l18a ?? null,
+                '18b': a.l18b ?? null,
+                '19': a.l19 ?? null,
+                '20': a.l20 ?? null,
+                '27': f.schedule8812.l27() ?? null
+              }
+            })()
           } as Lines
         },
+    scheduleEIC: !f.scheduleEIC.isNeeded()
+      ? null
+      : {
+          lines: {
+            qualifyingChildren: f.scheduleEIC.qualifyingDependents().length,
+            earnedIncome: f.scheduleEIC.earnedIncome(),
+            creditOnEarnedIncome: f.scheduleEIC.calculateEICForIncome(
+              f.scheduleEIC.earnedIncome()
+            ),
+            agiLookupThreshold: f.scheduleEIC.agiLookupThreshold(),
+            creditOnAgi: f.scheduleEIC.agiLookupRequired()
+              ? f.scheduleEIC.calculateEICForIncome(f.l11())
+              : null,
+            credit: f.scheduleEIC.credit()
+          } as Lines
+        },
+    f2441:
+      f.f2441 === undefined
+        ? null
+        : {
+            lines: {
+              '3': f.f2441.l3(),
+              '4': f.f2441.l4(),
+              '5': f.f2441.l5(),
+              '6': f.f2441.l6(),
+              '7': f.f2441.l7(),
+              '8': f.f2441.l8Percent(),
+              '9a': f.f2441.l9a(),
+              '9b': f.f2441.l9b(),
+              '9c': f.f2441.l9c(),
+              '10': f.f2441.l10(),
+              '11': f.f2441.l11(),
+              '26': f.f2441.l26() ?? null
+            } as Lines
+          },
+    f8863:
+      f.f8863 === undefined
+        ? null
+        : (() => {
+            const e = f.f8863
+            const [student] = e.data.students
+            const aotc = student.creditElection === 'aotc'
+            return {
+              lines: {
+                '1': e.l1(),
+                '2': e.l2(),
+                '3': e.l3(),
+                '4': e.l4(),
+                '5': e.l5(),
+                '6': Math.round(e.l6() * 1000),
+                '7': e.l7(),
+                '8': e.l8() ?? null,
+                '9': e.l9(),
+                '10': e.llcRawTotal(),
+                '11': e.l10TotalExpenses(),
+                '12': e.l10(),
+                '18': e.l18(),
+                '19': e.l19() ?? null,
+                '27': aotc ? e.studentAOTCExpenses(student) : null,
+                '28': aotc ? e.studentLine28(student) : null,
+                '29': aotc ? e.studentLine29(student) : null,
+                '30': aotc ? e.studentLine30(student) : null,
+                '31': aotc ? null : e.studentLLCExpenses(student)
+              } as Lines
+            }
+          })(),
+    f3903:
+      f.f3903 === undefined
+        ? null
+        : {
+            lines: {
+              '1': f.f3903.l1() ?? null,
+              '2': f.f3903.l2() ?? null,
+              '3': f.f3903.l3(),
+              '4': f.f3903.l4(),
+              '5': f.f3903.l5()
+            } as Lines
+          },
+    f8862:
+      f.f8862 === undefined
+        ? null
+        : {
+            lines: {
+              claimsEic: yesNo(f.f8862.data.claimsEic),
+              claimsCtc: yesNo(f.f8862.data.claimsCtc),
+              claimsAotc: yesNo(f.f8862.data.claimsAotc)
+            } as Lines
+          },
     f8283:
       f.f8283 === undefined || !f.f8283.isNeeded()
         ? null
@@ -637,10 +750,11 @@ export function calculationSnapshot(f: F1040) {
     /** The nonresident-alien spouse is treated as a resident (box and name on the form). */
     nraSpouseTreatedAsResident: f.nraSpouseTreatedAsResident(),
     /** Line 27c: the EIC is not claimed. */
-    eicDeclined: f.eicDeclined()
+    eicDeclined: f.eicDeclined(),
+    actcDeclined: f.actcDeclined()
   }
   return {
-    schemaVersion: 'ustaxes-1040-line-snapshot-v7',
+    schemaVersion: 'ustaxes-1040-line-snapshot-v8',
     taxYear: 2025,
     form: '1040',
     lines,

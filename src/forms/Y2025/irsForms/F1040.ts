@@ -67,6 +67,8 @@ import F8919 from './F8919'
 import F8853 from './F8853'
 import F2210 from './F2210'
 import F8283 from './F8283'
+import F3903 from './F3903'
+import F8862 from './F8862'
 import F8582 from './F8582'
 import F8829 from './F8829'
 import F8880 from './F8880'
@@ -123,6 +125,8 @@ export default class F1040 extends F1040Base {
   f8606?: F8606
   _f8606List?: F8606[]
   f8283?: F8283
+  f3903?: F3903
+  f8862?: F8862
   f8814?: F8814
   _f8814List?: F8814[]
   f8582?: F8582
@@ -210,6 +214,14 @@ export default class F1040 extends F1040Base {
       this.info.form8283.contributions.length > 0
     ) {
       this.f8283 = new F8283(this, this.info.form8283)
+    }
+
+    if (this.info.form3903 !== undefined) {
+      this.f3903 = new F3903(this, this.info.form3903)
+    }
+
+    if (this.info.form8862 !== undefined) {
+      this.f8862 = new F8862(this, this.info.form8862)
     }
 
     // Create Form 2441 if child/dependent care data exists
@@ -479,6 +491,8 @@ export default class F1040 extends F1040Base {
       this.f4562,
       this.f4797,
       this.f8283,
+      this.f3903,
+      this.f8862,
       this.f8606,
       this.f8829,
       this.f8863,
@@ -648,7 +662,7 @@ export default class F1040 extends F1040Base {
   l1c = (): number | undefined => this.f4137?.l4()
   l1d = (): number | undefined => this.info.medicaidWaiverPayments ?? undefined
   l1e = (): number | undefined => {
-    const val = this.f2441?.l14()
+    const val = this.f2441?.l26()
     return val !== undefined && val > 0 ? val : undefined
   }
   l1f = (): number | undefined => undefined
@@ -851,6 +865,8 @@ export default class F1040 extends F1040Base {
     this.scheduleEIC.isNeeded() ? this.scheduleEIC.credit() : 0
   /** Line 27c: the taxpayer elected not to claim the EIC. */
   eicDeclined = (): boolean => this.info.questions.DECLINE_EIC ?? false
+  /** Line 28 box: the taxpayer elected not to claim the additional child tax credit. */
+  actcDeclined = (): boolean => this.info.questions.DECLINE_ACTC ?? false
   /** The spouse's date of death as the form prints it, when the spouse died during the year. */
   spouseDateOfDeathText = (): string => {
     const iso = this.info.taxPayer.spouse?.dateOfDeath
@@ -1092,6 +1108,7 @@ export default class F1040 extends F1040Base {
     // TY2025 line 27c is an election NOT to claim EIC, not an age test.
     set('line_27c', this.eicDeclined())
     set('line_28', this.l28())
+    set('line_28_decline_actc', this.actcDeclined())
     set('line_29', this.l29())
     set('line_31', this.l31())
     set('line_32', this.l32())

@@ -19,6 +19,7 @@ export default class Schedule1 extends F1040Attachment {
 
   isNeeded = (): boolean =>
     this.f1040.scheduleE.isNeeded() ||
+    (this.f1040.f3903?.isNeeded() ?? false) ||
     (this.f1040.scheduleC?.isNeeded() ?? false) ||
     (this.f1040.scheduleF?.isNeeded() ?? false) ||
     (this.f1040.f4797?.l7() ?? 0) !== 0 ||
@@ -174,7 +175,8 @@ export default class Schedule1 extends F1040Attachment {
   l12 = (): number | undefined => undefined
   l13 = (): number | undefined =>
     sumFields([this.f1040.f8889.l13(), this.f1040.f8889Spouse?.l13()])
-  l14 = (): number | undefined => undefined
+  /** Line 14: Form 3903 line 5. */
+  l14 = (): number | undefined => this.f1040.f3903?.l5()
   l15 = (): number | undefined => this.f1040.scheduleSE.l13()
   // Line 16: Self-employed SEP, SIMPLE, and qualified plans
   l16 = (): number | undefined =>

@@ -121,6 +121,9 @@ export const F1040_FIELDS: Record<string, string> = {
   line_27a: 'f2_23',
   line_27c: 'c2_13', // Election not to claim EIC (not an age test)
   line_28: 'f2_24',
+  // The line 28 box: the additional child tax credit is not claimed.
+  line_28_decline_actc:
+    'topmostSubform[0].Page2[0].Line28_ReadOrder[0].c2_14[0]',
   line_29: 'f2_25',
   line_30: 'f2_26',
   line_31: 'f2_27',
