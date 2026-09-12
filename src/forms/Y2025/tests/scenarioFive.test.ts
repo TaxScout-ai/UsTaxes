@@ -171,7 +171,7 @@ describe('ATS Scenario 5 (head of household, blind, two children, 2441, 8863, EI
       claimsCtc: 1,
       claimsAotc: 1
     })
-    expect(s.schemaVersion).toBe('ustaxes-1040-line-snapshot-v8')
+    expect(s.schemaVersion).toBe('ustaxes-1040-line-snapshot-v9')
   })
 
   it('prints the head of household, blindness and line 28 boxes on Form 1040', async () => {

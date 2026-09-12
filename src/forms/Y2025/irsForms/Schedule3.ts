@@ -21,6 +21,8 @@ export default class Schedule3 extends F1040Attachment {
     (this.f1040.scheduleR?.l22() ?? 0) > 0 ||
     (this.f1040.f8801?.credit() ?? 0) > 0 ||
     (this.f1040.f8911?.l10() ?? 0) > 0 ||
+    (this.f1040.f3800?.l38() ?? 0) > 0 ||
+    (this.f1040.f8936?.l13() ?? 0) > 0 ||
     this.l15() > 0
 
   deductions = (): number => 0
@@ -36,12 +38,20 @@ export default class Schedule3 extends F1040Attachment {
   l5b = (): number | undefined => this.f1040.f5695?.pdfL32()
   // Compatibility total; PDF and worksheet bindings use 5a and 5b separately.
   l5 = (): number => sumFields([this.l5a(), this.l5b()])
-  l6a = (): number | undefined => undefined // TODO: other credits
+  /** Line 6a: the general business credit allowed, Form 3800 line 38. */
+  l6a = (): number | undefined => {
+    const credit = this.f1040.f3800?.l38() ?? 0
+    return credit > 0 ? credit : undefined
+  }
   l6b = (): number | undefined => this.f1040.f8801?.credit()
   l6c = (): number | undefined => undefined // TODO: other credits
   l6d = (): number | undefined => this.f1040.scheduleR?.l22()
   l6e = (): number | undefined => undefined // TODO: other credits
-  l6f = (): number | undefined => undefined // TODO: other credits
+  /** Line 6f: the personal use part of the clean vehicle credit, Form 8936 line 13. */
+  l6f = (): number | undefined => {
+    const credit = this.f1040.f8936?.l13() ?? 0
+    return credit > 0 ? credit : undefined
+  }
   l6g = (): number | undefined => undefined // TODO: other credits
   l6h = (): number | undefined => undefined // District of Columbia first-time homebuyer
   l6i = (): number | undefined => undefined // TODO: other credits

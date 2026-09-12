@@ -142,6 +142,6 @@ describe('ATS Scenario 2 (joint, deceased NRA-election spouse, statutory employe
   })
 
   it('is v7', () => {
-    expect(snapshot().schemaVersion).toBe('ustaxes-1040-line-snapshot-v8')
+    expect(snapshot().schemaVersion).toBe('ustaxes-1040-line-snapshot-v9')
   })
 })

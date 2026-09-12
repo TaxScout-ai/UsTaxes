@@ -40,6 +40,11 @@ type Lines = Record<string, number | null>
  * the first student's Part III, line 6 in thousandths), Schedule 8812 Part
  * II-A, Form 3903 (Schedule 1 line 14), Form 8862 (the Part I boxes),
  * Schedule 3 lines 1–4, and the line 28 ACTC opt-out among the indicators.
+ *
+ * v9 adds the general business credit chain behind Schedule 3 line 6a: Form
+ * 3800 (Parts I–II and the Part III lines 1f/1y/2 by column), Form 8835
+ * (Part II), Form 8936 (Parts I–III) with its first Schedule A (line 10 a
+ * ratio in hundred-thousandths, yes/no lines 1/0), and Schedule 3 line 6f.
  */
 const yesNo = (v: boolean | undefined): number | null =>
   v === undefined ? null : v ? 1 : 0
@@ -160,6 +165,8 @@ export function calculationSnapshot(f: F1040) {
         '5a': f.schedule3.l5a() ?? null,
         '5b': f.schedule3.l5b() ?? null,
         '5': f.schedule3.l5(),
+        '6a': f.schedule3.l6a() ?? null,
+        '6f': f.schedule3.l6f() ?? null,
         '6j': f.schedule3.l6j() ?? null,
         '7': f.schedule3.l7(),
         '8': f.schedule3.l8()
@@ -207,6 +214,122 @@ export function calculationSnapshot(f: F1040) {
                 '19': a.l19() ?? null,
                 '20': a.l20(),
                 '21': a.l21() ?? null
+              } as Lines
+            }
+          })(),
+    f3800:
+      f.f3800 === undefined || !f.f3800.isNeeded()
+        ? null
+        : (() => {
+            const rows = Object.fromEntries(
+              f.f3800.partIII().flatMap((r) => [
+                [`${r.line}e`, r.notPassive],
+                [`${r.line}f`, r.transferElection],
+                [`${r.line}g`, r.combined],
+                [`${r.line}i`, r.applied]
+              ])
+            ) as Lines
+            return {
+              lines: {
+                Bi: yesNo(f.f3800.lBi()),
+                Bii: f.f3800.lBii() ?? null,
+                '1': f.f3800.l1(),
+                '2': f.f3800.l2(),
+                '3': f.f3800.l3(),
+                '6': f.f3800.l6(),
+                '7': f.f3800.l7(),
+                '8': f.f3800.l8(),
+                '9': f.f3800.l9(),
+                '10a': f.f3800.l10a() ?? null,
+                '10b': f.f3800.l10b(),
+                '10c': f.f3800.l10c(),
+                '11': f.f3800.l11(),
+                '12': f.f3800.l12() ?? null,
+                '13': f.f3800.l13() ?? null,
+                '14': f.f3800.l14() ?? null,
+                '15': f.f3800.l15() ?? null,
+                '16': f.f3800.l16(),
+                '17': f.f3800.l17(),
+                '26': f.f3800.l26(),
+                '27': f.f3800.l27(),
+                '28': f.f3800.l28(),
+                '29': f.f3800.l29(),
+                '30': f.f3800.l30(),
+                '36': f.f3800.l36(),
+                '37': f.f3800.l37(),
+                '38': f.f3800.l38(),
+                ...rows,
+                '2e': f.f3800.l2e(),
+                '2f': f.f3800.l2f(),
+                '2g': f.f3800.l2g(),
+                '2i': f.f3800.l2i()
+              } as Lines
+            }
+          })(),
+    f8835:
+      f.f8835 === undefined
+        ? null
+        : {
+            lines: {
+              '1d': f.f8835.kilowattHours('solar') ?? null,
+              '1dc': f.f8835.l1c('solar') ?? null,
+              '2': f.f8835.l2(),
+              '3': f.f8835.l3(),
+              '4': f.f8835.l4(),
+              '5d': f.f8835.l5d(),
+              '6': f.f8835.l6(),
+              '7g': f.f8835.l7g(),
+              '8': f.f8835.l8(),
+              '9': f.f8835.l9(),
+              '10': f.f8835.l10(),
+              '11': f.f8835.l11(),
+              '12': f.f8835.l12(),
+              '13': f.f8835.l13(),
+              '14': f.f8835.l14() ?? null,
+              '15': f.f8835.l15()
+            } as Lines
+          },
+    f8936:
+      f.f8936 === undefined
+        ? null
+        : {
+            lines: {
+              '1a': f.f8936.l1a(),
+              '2': f.f8936.l2(),
+              '3a': f.f8936.l3a(),
+              '4': f.f8936.l4(),
+              '6': f.f8936.l6(),
+              '7': f.f8936.l7() ?? null,
+              '8': f.f8936.l8(),
+              '9': f.f8936.l9(),
+              '10': f.f8936.l10() ?? null,
+              '11': f.f8936.l11() ?? null,
+              '12': f.f8936.l12() ?? null,
+              '13': f.f8936.l13() ?? null
+            } as Lines
+          },
+    f8936ScheduleA:
+      f.f8936 === undefined
+        ? null
+        : (() => {
+            const [a] = f.f8936.schedules
+            return {
+              lines: {
+                '1a': a.l1a(),
+                '4a': yesNo(a.l4a()),
+                '5': yesNo(a.l5()),
+                '8a': yesNo(a.l8a()),
+                '8b': yesNo(a.l8b()),
+                '8c': yesNo(a.l8c()),
+                '8d': yesNo(a.l8d()),
+                '8e': yesNo(a.l8e()),
+                '9': a.l9() ?? null,
+                '10':
+                  a.l10() === undefined
+                    ? null
+                    : Math.round((a.l10() ?? 0) * 100000),
+                '11': a.l11() ?? null,
+                '12': a.l12() ?? null
               } as Lines
             }
           })(),
@@ -754,7 +877,7 @@ export function calculationSnapshot(f: F1040) {
     actcDeclined: f.actcDeclined()
   }
   return {
-    schemaVersion: 'ustaxes-1040-line-snapshot-v8',
+    schemaVersion: 'ustaxes-1040-line-snapshot-v9',
     taxYear: 2025,
     form: '1040',
     lines,

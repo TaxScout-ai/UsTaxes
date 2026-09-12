@@ -118,7 +118,7 @@ describe('ATS Scenario 13 (MFJ W-2, Form 8911 Schedule A, Form 6251)', () => {
 
   it('is v7 and reports the absent attachments as null', () => {
     const s = snapshot()
-    expect(s.schemaVersion).toBe('ustaxes-1040-line-snapshot-v8')
+    expect(s.schemaVersion).toBe('ustaxes-1040-line-snapshot-v9')
     expect(s.indicators).toMatchObject({
       primary65OrOlder: false,
       spouse65OrOlder: false,
