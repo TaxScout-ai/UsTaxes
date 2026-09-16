@@ -41,7 +41,8 @@ const toLine = (position: SoldAsset<Date>): Line => [
   position.openPrice * position.quantity + position.openFee,
   undefined,
   undefined,
-  (position.closePrice * position.quantity - (position.closeFee ?? 0)) -
+  position.closePrice * position.quantity -
+    (position.closeFee ?? 0) -
     (position.openPrice * position.quantity + position.openFee)
 ]
 
@@ -70,11 +71,12 @@ export default class F8949 extends F1040Attachment {
 
   copies = (): F8949[] => {
     if (this.index === 0) {
-      const extraCopiesNeeded = Math.floor(
-        Math.max(
-          this.thisYearShortTermSales().length / NUM_SHORT_LINES,
-          this.thisYearLongTermSales().length / NUM_LONG_LINES
-        )
+      // Copies needed to print every sale, less this one: 14 sales fit on
+      // a part, the 15th starts a second copy.
+      const extraCopiesNeeded = Math.max(
+        0,
+        Math.ceil(this.thisYearShortTermSales().length / NUM_SHORT_LINES) - 1,
+        Math.ceil(this.thisYearLongTermSales().length / NUM_LONG_LINES) - 1
       )
       return Array.from(Array(extraCopiesNeeded)).map(
         (_, i) => new F8949(this.f1040, i + 1)

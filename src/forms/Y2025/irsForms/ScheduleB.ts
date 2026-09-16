@@ -27,11 +27,12 @@ export default class ScheduleB extends F1040Attachment {
       const numInterestPayers = this.l1Fields().length
       const numDivPayers = this.l5Fields().length
 
-      const extraCopiesNeeded = Math.floor(
-        Math.max(
-          numInterestPayers / this.interestPayersLimit,
-          numDivPayers / this.dividendPayersLimit
-        )
+      // Copies needed to print every payer, less this one: 14 interest
+      // payers fit on one copy, the 15th starts a second.
+      const extraCopiesNeeded = Math.max(
+        0,
+        Math.ceil(numInterestPayers / this.interestPayersLimit) - 1,
+        Math.ceil(numDivPayers / this.dividendPayersLimit) - 1
       )
 
       return Array.from(Array(extraCopiesNeeded)).map(
