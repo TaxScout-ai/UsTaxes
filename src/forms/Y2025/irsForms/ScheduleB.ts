@@ -1,8 +1,8 @@
 import F1040Attachment from './F1040Attachment'
 import { FormTag } from 'ustaxes/core/irsForms/Form'
-import { sumFields } from 'ustaxes/core/irsForms/util'
 import { Field } from 'ustaxes/core/pdfFiller'
 import F1040 from './F1040'
+import { roundLine, sumToWholeDollars } from './rounding'
 
 interface PayerAmount {
   payer?: string
@@ -54,6 +54,7 @@ export default class ScheduleB extends F1040Attachment {
     this.f1040.info.questions.FOREIGN_ACCOUNT_EXISTS === true ||
     this.f1040.info.questions.FOREIGN_TRUST_RELATIONSHIP === true
 
+  /** Payers with an amount; a form reporting none is not a Schedule B row. */
   l1Fields = (): PayerAmount[] =>
     this.f1040
       .f1099Ints()
@@ -67,6 +68,7 @@ export default class ScheduleB extends F1040Attachment {
           amount: v.interestIncome
         }))
       )
+      .filter(({ amount }) => amount !== 0)
 
   l1 = (): Array<string | undefined> => {
     const payerValues = this.l1Fields().slice(
@@ -76,12 +78,27 @@ export default class ScheduleB extends F1040Attachment {
     const rightPad = 2 * (this.interestPayersLimit - payerValues.length)
     // ensure we return an array of length interestPayersLimit * 2.
     // This form may have multiple copies, only display the copies for this form
+    // Each payer's amount prints rounded; the total adds the cents first.
     return payerValues
-      .flatMap(({ payer, amount }) => [payer, amount?.toString()])
+      .flatMap(({ payer, amount }) => [
+        payer,
+        amount === undefined ? undefined : roundLine(amount).toString()
+      ])
       .concat(Array(rightPad).fill(undefined))
   }
 
-  l2 = (): number => sumFields(this.l1Fields().map(({ amount }) => amount))
+  /**
+   * "If you have to add two or more amounts to figure the amount to enter on
+   * a line, include cents when adding the amounts and round off only the
+   * total" (2025 Instructions for Form 1040, Rounding Off to Whole Dollars).
+   */
+  l2 = (): number =>
+    sumToWholeDollars(
+      this.l1Fields().flatMap(({ amount }) =>
+        amount === undefined ? [] : [amount]
+      ),
+      'Schedule B line 1'
+    )
 
   // TODO: Interest from tax exempt savings bonds
   l3 = (): number | undefined => undefined
@@ -95,11 +112,18 @@ export default class ScheduleB extends F1040Attachment {
    */
   to1040l2b = (): number => this.l4()
 
+  /**
+   * Payers of ordinary dividends; a 1099-DIV reporting only a capital gain
+   * distribution has no Part II row.
+   */
   l5Fields = (): PayerAmount[] =>
-    this.f1040.f1099Divs().map((v) => ({
-      payer: v.payer,
-      amount: v.form.dividends
-    }))
+    this.f1040
+      .f1099Divs()
+      .map((v) => ({
+        payer: v.payer,
+        amount: v.form.dividends
+      }))
+      .filter(({ amount }) => amount !== 0)
 
   l5 = (): Array<string | undefined | number> => {
     const payerValues = this.l5Fields().slice(
@@ -109,11 +133,20 @@ export default class ScheduleB extends F1040Attachment {
 
     const rightPad = 2 * (this.dividendPayersLimit - payerValues.length)
     return payerValues
-      .flatMap(({ payer, amount }) => [payer, amount])
+      .flatMap(({ payer, amount }) => [
+        payer,
+        amount === undefined ? undefined : roundLine(amount)
+      ])
       .concat(Array(rightPad).fill(undefined))
   }
 
-  l6 = (): number => sumFields(this.l5Fields().map(({ amount }) => amount))
+  l6 = (): number =>
+    sumToWholeDollars(
+      this.l5Fields().flatMap(({ amount }) =>
+        amount === undefined ? [] : [amount]
+      ),
+      'Schedule B line 5'
+    )
 
   /**
    * Total dividends on all schedule Bs.
@@ -135,7 +168,11 @@ export default class ScheduleB extends F1040Attachment {
     !this.foreignAccount()
   ]
 
-  l7a2 = (): [boolean, boolean] => [this.fincenForm(), !this.fincenForm()]
+  /** Line 7a's second question is asked only after a Yes on the first. */
+  l7a2 = (): [boolean, boolean] =>
+    this.foreignAccount()
+      ? [this.fincenForm(), !this.fincenForm()]
+      : [false, false]
 
   l7b = (): string | undefined => this.fincenCountry()
 

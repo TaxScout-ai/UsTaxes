@@ -648,10 +648,12 @@ export default class F1040 extends F1040Base {
       .amount
   }
 
+  /** Line 3a: box 1b cents added across 1099-DIVs, the total rounded once. */
   totalQualifiedDividends = (): number =>
-    this.f1099Divs()
-      .map((f) => f.form.qualifiedDividends)
-      .reduce((l, r) => l + r, 0)
+    sumToWholeDollars(
+      this.f1099Divs().map((f) => f.form.qualifiedDividends),
+      'Form 1099-DIV box 1b'
+    )
 
   totalGrossDistributionsFromIra = (): number =>
     this.info.individualRetirementArrangements.reduce(

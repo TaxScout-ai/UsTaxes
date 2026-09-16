@@ -45,6 +45,10 @@ type Lines = Record<string, number | null>
  * 3800 (Parts I–II and the Part III lines 1f/1y/2 by column), Form 8835
  * (Part II), Form 8936 (Parts I–III) with its first Schedule A (line 10 a
  * ratio in hundred-thousandths, yes/no lines 1/0), and Schedule 3 line 6f.
+ *
+ * v10 adds Form 1040 lines 2a and 3a and Schedule B (when the return files
+ * it): lines 2–4 and 6, the Part III answers as 1/0, and the number of
+ * interest and dividend payers the schedule lists.
  */
 const yesNo = (v: boolean | undefined): number | null =>
   v === undefined ? null : v ? 1 : 0
@@ -53,7 +57,9 @@ export function calculationSnapshot(f: F1040) {
   const lines: Lines = {
     '1a': f.l1a(),
     '1z': f.l1z(),
+    '2a': f.l2a() ?? null,
     '2b': f.l2b() ?? null,
+    '3a': f.l3a() ?? null,
     '3b': f.l3b() ?? null,
     '4a': f.l4a() ?? null,
     '4b': f.l4b() ?? null,
@@ -550,6 +556,23 @@ export function calculationSnapshot(f: F1040) {
             '18': yesNo(f.scheduleA.l18())
           } as Lines
         },
+    scheduleB: !f.scheduleB.isNeeded()
+      ? null
+      : {
+          lines: {
+            '2': f.scheduleB.l2(),
+            '3': f.scheduleB.l3() ?? null,
+            '4': f.scheduleB.l4(),
+            '6': f.scheduleB.l6(),
+            '7a': yesNo(f.scheduleB.foreignAccount()),
+            '7a2': f.scheduleB.foreignAccount()
+              ? yesNo(f.scheduleB.fincenForm())
+              : null,
+            '8': yesNo(f.scheduleB.foreignTrust()),
+            interestPayerCount: f.scheduleB.l1Fields().length,
+            dividendPayerCount: f.scheduleB.l5Fields().length
+          } as Lines
+        },
     schedule8812: !f.schedule8812.isNeeded()
       ? null
       : {
@@ -877,7 +900,7 @@ export function calculationSnapshot(f: F1040) {
     actcDeclined: f.actcDeclined()
   }
   return {
-    schemaVersion: 'ustaxes-1040-line-snapshot-v9',
+    schemaVersion: 'ustaxes-1040-line-snapshot-v10',
     taxYear: 2025,
     form: '1040',
     lines,
