@@ -4,7 +4,7 @@ import { FormTag } from 'ustaxes/core/irsForms/Form'
 import { Field } from 'ustaxes/core/pdfFiller'
 import F1040 from './F1040'
 import { SCHEDULE_A_FIELDS } from '../fieldMaps'
-import { roundLine } from './rounding'
+import { rateToWholeDollars, roundLine, sumToWholeDollars } from './rounding'
 
 const blankItemizedDeductions = {
   medicalAndDental: 0,
@@ -67,20 +67,45 @@ export default class ScheduleA extends F1040Attachment {
     Number(this.itemizedDeductions.stateAndLocalRealEstateTaxes)
   l5c = (): number => Number(this.itemizedDeductions.stateAndLocalPropertyTaxes)
   l5d = (): number => this.l5a() + this.l5b() + this.l5c()
+  /**
+   * Line 5e: the 2025 State and Local Tax Deduction Worksheet
+   * (Instructions for Schedule A, line 5e), line by line. Two points the
+   * worksheet settles that a reading of the statute alone does not:
+   * - line 4 is Form 1040 line 11b plus excluded Puerto Rico income, Form 2555
+   *   lines 45 and 50 and Form 4563 line 15, not AGI alone;
+   * - married filing separately uses $250,000 on line 5 but the full $40,000
+   *   and $10,000 on lines 1 and 9, and halves only the result on line 10.
+   */
   l5e = (): number => {
-    // OBBBA 2025: SALT cap raised from $10K to $40K ($20K for MFS)
-    // Phaseout: 30% of (MAGI - $500K), floor $10K ($5K MFS)
     const isMfs = this.f1040.info.taxPayer.filingStatus === FilingStatus.MFS
-    const baseCap = isMfs ? 20000 : 40000
-    const threshold = isMfs ? 250000 : 500000
-    const floor = isMfs ? 5000 : 10000
-    const magi = this.f1040.l11() // AGI as MAGI proxy
-    let cap = baseCap
-    if (magi > threshold) {
-      const reduction = Math.round((magi - threshold) * 0.3)
-      cap = Math.max(floor, baseCap - reduction)
-    }
-    return Math.min(cap, this.l5d())
+    const exclusions = this.f1040.info.schedule1AData?.incomeExclusions
+    const line1 = 40000
+    const line4 = sumToWholeDollars(
+      [
+        roundLine(this.f1040.l11()),
+        exclusions?.puertoRico ?? 0,
+        roundLine(this.f1040.f2555?.l45() ?? 0),
+        roundLine(this.f1040.f2555?.l50() ?? 0),
+        exclusions?.form4563 ?? 0
+      ],
+      'Schedule A line 5e worksheet line 4'
+    )
+    const line5 = isMfs ? 250000 : 500000
+    const line9 =
+      line4 > line5
+        ? Math.max(
+            line1 -
+              rateToWholeDollars(
+                line4 - line5,
+                30,
+                100,
+                'Schedule A line 5e worksheet line 7'
+              ),
+            10000
+          )
+        : line1
+    const line10 = isMfs ? roundLine(line9 / 2) : line9
+    return Math.min(line10, this.l5d())
   }
 
   l6OtherTaxesTypeAndAmount1 = (): string | undefined => undefined
