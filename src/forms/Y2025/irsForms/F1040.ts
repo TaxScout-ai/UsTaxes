@@ -878,8 +878,13 @@ export default class F1040 extends F1040Base {
 
   l25d = (): number => sumFields([this.l25a(), this.l25b(), this.l25c()])
 
+  /** Estimated payments, including a 2024 overpayment applied: cents are
+   * added before the line is rounded, like every other source total. */
   l26 = (): number =>
-    this.info.estimatedTaxes.reduce((res, et) => res + et.payment, 0)
+    sumToWholeDollars(
+      this.info.estimatedTaxes.map((et) => et.payment),
+      'Estimated tax payment'
+    )
 
   l27 = (): number =>
     this.scheduleEIC.isNeeded() ? this.scheduleEIC.credit() : 0
