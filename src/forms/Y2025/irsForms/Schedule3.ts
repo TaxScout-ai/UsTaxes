@@ -3,6 +3,7 @@ import { sumFields } from 'ustaxes/core/irsForms/util'
 import { FormTag } from 'ustaxes/core/irsForms/Form'
 import { Field } from 'ustaxes/core/pdfFiller'
 import { excessSocialSecurity } from './excessSocialSecurity'
+import { sumToWholeDollars } from './rounding'
 
 export default class Schedule3 extends F1040Attachment {
   tag: FormTag = 'f1040s3'
@@ -99,8 +100,12 @@ export default class Schedule3 extends F1040Attachment {
   l9 = (): number | undefined => this.f1040.f8962?.credit()
 
   // Line 10: Amount paid with extension for time to file
-  l10 = (): number | undefined =>
-    this.f1040.info.extensionPaymentAmount ?? undefined
+  l10 = (): number | undefined => {
+    const paid = this.f1040.info.extensionPaymentAmount
+    return paid === undefined || paid === 0
+      ? undefined
+      : sumToWholeDollars([paid], 'Amount paid with extension')
+  }
 
   l11 = (): number =>
     // TODO: also applies to RRTA tax

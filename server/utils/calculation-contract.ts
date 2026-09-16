@@ -170,6 +170,37 @@ export function validateCalculationRequest(raw: unknown): ContractIssue[] {
       }
     }
   }
+  if (raw.taxYear === 'Y2025') {
+    // Lines 26 and Schedule 3 line 10 add these cents before rounding; a
+    // negative or sub-cent payment is not a payment the return can report.
+    const payment = (amount: unknown, path: string, label: string) => {
+      try {
+        if (typeof amount !== 'number' || amount < 0)
+          throw new Error('Expected nonnegative money')
+        toExactCents(amount, label)
+      } catch {
+        issue(
+          path,
+          'invalid_money',
+          'Expected nonnegative exact cents within the safe range'
+        )
+      }
+    }
+    if (Array.isArray(normalized.estimatedTaxes))
+      for (const [i, et] of normalized.estimatedTaxes.entries())
+        if (object(et))
+          payment(
+            et.payment,
+            `/information/estimatedTaxes/${i}/payment`,
+            'Estimated tax payment'
+          )
+    if (normalized.extensionPaymentAmount !== undefined)
+      payment(
+        normalized.extensionPaymentAmount,
+        '/information/extensionPaymentAmount',
+        'Amount paid with extension'
+      )
+  }
   return issues
 }
 

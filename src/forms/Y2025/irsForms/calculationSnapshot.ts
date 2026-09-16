@@ -175,7 +175,15 @@ export function calculationSnapshot(f: F1040) {
         '6f': f.schedule3.l6f() ?? null,
         '6j': f.schedule3.l6j() ?? null,
         '7': f.schedule3.l7(),
-        '8': f.schedule3.l8()
+        '8': f.schedule3.l8(),
+        '9': f.schedule3.l9() ?? null,
+        '10': f.schedule3.l10() ?? null,
+        '11': f.schedule3.l11(),
+        '12': f.schedule3.l12() ?? null,
+        '13a': f.schedule3.l13a() ?? null,
+        '13z': f.schedule3.l13z() ?? null,
+        '14': f.schedule3.l14(),
+        '15': f.schedule3.l15()
       } as Lines
     },
     f8911:
@@ -900,7 +908,7 @@ export function calculationSnapshot(f: F1040) {
     actcDeclined: f.actcDeclined()
   }
   return {
-    schemaVersion: 'ustaxes-1040-line-snapshot-v10',
+    schemaVersion: 'ustaxes-1040-line-snapshot-v11',
     taxYear: 2025,
     form: '1040',
     lines,
