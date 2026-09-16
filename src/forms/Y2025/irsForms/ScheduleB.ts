@@ -54,6 +54,7 @@ export default class ScheduleB extends F1040Attachment {
     this.f1040.info.questions.FOREIGN_ACCOUNT_EXISTS === true ||
     this.f1040.info.questions.FOREIGN_TRUST_RELATIONSHIP === true
 
+  /** Payers with an amount; a form reporting none is not a Schedule B row. */
   l1Fields = (): PayerAmount[] =>
     this.f1040
       .f1099Ints()
@@ -67,6 +68,7 @@ export default class ScheduleB extends F1040Attachment {
           amount: v.interestIncome
         }))
       )
+      .filter(({ amount }) => amount !== 0)
 
   l1 = (): Array<string | undefined> => {
     const payerValues = this.l1Fields().slice(
@@ -110,11 +112,18 @@ export default class ScheduleB extends F1040Attachment {
    */
   to1040l2b = (): number => this.l4()
 
+  /**
+   * Payers of ordinary dividends; a 1099-DIV reporting only a capital gain
+   * distribution has no Part II row.
+   */
   l5Fields = (): PayerAmount[] =>
-    this.f1040.f1099Divs().map((v) => ({
-      payer: v.payer,
-      amount: v.form.dividends
-    }))
+    this.f1040
+      .f1099Divs()
+      .map((v) => ({
+        payer: v.payer,
+        amount: v.form.dividends
+      }))
+      .filter(({ amount }) => amount !== 0)
 
   l5 = (): Array<string | undefined | number> => {
     const payerValues = this.l5Fields().slice(
@@ -159,7 +168,11 @@ export default class ScheduleB extends F1040Attachment {
     !this.foreignAccount()
   ]
 
-  l7a2 = (): [boolean, boolean] => [this.fincenForm(), !this.fincenForm()]
+  /** Line 7a's second question is asked only after a Yes on the first. */
+  l7a2 = (): [boolean, boolean] =>
+    this.foreignAccount()
+      ? [this.fincenForm(), !this.fincenForm()]
+      : [false, false]
 
   l7b = (): string | undefined => this.fincenCountry()
 

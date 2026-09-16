@@ -46,12 +46,16 @@ describe('calculation snapshot v10: interest, dividends and Schedule B', () => {
       '4': 1900,
       '6': 2000,
       '7a': 0,
-      '7a2': 0,
+      '7a2': null,
       '8': 0,
       interestPayerCount: 2,
       dividendPayerCount: 1
     })
     expect(s.worksheets.qualifiedDividendsCapitalGains).not.toBeNull()
+    // Line 7a is No, so its FinCEN Form 114 question stays unanswered.
+    expect(new F1040(rehearsalInformation(60000), []).scheduleB.l7a2()).toEqual(
+      [false, false]
+    )
   })
 
   it('adds source cents before rounding lines 2b, 3a, 3b and Schedule B', () => {
@@ -96,6 +100,34 @@ describe('calculation snapshot v10: interest, dividends and Schedule B', () => {
     ])
     expect(Number.isInteger(s.lines['9'])).toBe(true)
     expect(Number.isInteger(s.lines['15'])).toBe(true)
+  })
+
+  it('lists no Part II row for a 1099-DIV with only a capital gain distribution', () => {
+    const info = rehearsalInformation(60000)
+    info.f1099s = [
+      {
+        payer: 'Synthetic Bank',
+        type: Income1099Type.INT,
+        personRole: PersonRole.PRIMARY,
+        form: { income: 1600 }
+      },
+      {
+        payer: 'Synthetic REIT',
+        type: Income1099Type.DIV,
+        personRole: PersonRole.PRIMARY,
+        form: {
+          dividends: 0,
+          qualifiedDividends: 0,
+          totalCapitalGainsDistributions: 700
+        }
+      }
+    ]
+    const s = calculationSnapshot(new F1040(info, []))
+    expect(s.attachments.scheduleB?.lines).toMatchObject({
+      '6': 0,
+      interestPayerCount: 1,
+      dividendPayerCount: 0
+    })
   })
 
   it('reports no Schedule B when neither total is over $1,500', () => {

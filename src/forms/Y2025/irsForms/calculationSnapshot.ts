@@ -565,7 +565,9 @@ export function calculationSnapshot(f: F1040) {
             '4': f.scheduleB.l4(),
             '6': f.scheduleB.l6(),
             '7a': yesNo(f.scheduleB.foreignAccount()),
-            '7a2': yesNo(f.scheduleB.fincenForm()),
+            '7a2': f.scheduleB.foreignAccount()
+              ? yesNo(f.scheduleB.fincenForm())
+              : null,
             '8': yesNo(f.scheduleB.foreignTrust()),
             interestPayerCount: f.scheduleB.l1Fields().length,
             dividendPayerCount: f.scheduleB.l5Fields().length
