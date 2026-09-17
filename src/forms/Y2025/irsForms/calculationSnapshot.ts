@@ -905,10 +905,12 @@ export function calculationSnapshot(f: F1040) {
     nraSpouseTreatedAsResident: f.nraSpouseTreatedAsResident(),
     /** Line 27c: the EIC is not claimed. */
     eicDeclined: f.eicDeclined(),
+    /** Line 5c box 1: a rollover from a qualified employer's plan (1099-R code G or H). */
+    pensionsRollover: f.l5cRollover(),
     actcDeclined: f.actcDeclined()
   }
   return {
-    schemaVersion: 'ustaxes-1040-line-snapshot-v11',
+    schemaVersion: 'ustaxes-1040-line-snapshot-v12',
     taxYear: 2025,
     form: '1040',
     lines,
