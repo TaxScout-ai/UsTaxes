@@ -62,7 +62,10 @@ export default class ScheduleD extends F1040Attachment {
   l1ag = (): number | undefined => undefined
   l1ah = (): number => sumFields([this.l1ad(), 0 - (this.l1ae() ?? 0)])
 
-  l1f8949s = (): F8949[] => this.f1040.f8949s.filter((f) => f.part1BoxA())
+  // The printed line takes both boxes: securities on a 1099-B and
+  // digital assets on a 1099-DA.
+  l1f8949s = (): F8949[] =>
+    this.f1040.f8949s.filter((f) => f.part1BoxA() || f.part1BoxG())
 
   l1bd = (): number =>
     sumFields(this.l1f8949s().map((f) => f.shortTermTotalProceeds()))
@@ -74,7 +77,10 @@ export default class ScheduleD extends F1040Attachment {
   l1bh = (): number =>
     sumFields(this.l1f8949s().map((f) => f.shortTermTotalGain()))
 
-  l2f8949s = (): F8949[] => this.f1040.f8949s.filter((f) => f.part1BoxB())
+  // The printed line takes both boxes: securities on a 1099-B and
+  // digital assets on a 1099-DA.
+  l2f8949s = (): F8949[] =>
+    this.f1040.f8949s.filter((f) => f.part1BoxB() || f.part1BoxH())
 
   l2d = (): number =>
     sumFields(this.l2f8949s().map((f) => f.shortTermTotalProceeds()))
@@ -88,7 +94,10 @@ export default class ScheduleD extends F1040Attachment {
   l2h = (): number =>
     sumFields(this.l2f8949s().map((f) => f.shortTermTotalGain()))
 
-  l3f8949s = (): F8949[] => this.f1040.f8949s.filter((f) => f.part1BoxC())
+  // The printed line takes both boxes: securities on a 1099-B and
+  // digital assets on a 1099-DA.
+  l3f8949s = (): F8949[] =>
+    this.f1040.f8949s.filter((f) => f.part1BoxC() || f.part1BoxI())
 
   l3d = (): number =>
     sumFields(this.l3f8949s().map((f) => f.shortTermTotalProceeds()))
@@ -140,7 +149,10 @@ export default class ScheduleD extends F1040Attachment {
   l8ah = (): number | undefined =>
     sumFields([this.l8ad(), 0 - (this.l8ae() ?? 0)])
 
-  l8f8949s = (): F8949[] => this.f1040.f8949s.filter((f) => f.part2BoxD())
+  // The printed line takes both boxes: securities on a 1099-B and
+  // digital assets on a 1099-DA.
+  l8f8949s = (): F8949[] =>
+    this.f1040.f8949s.filter((f) => f.part2BoxD() || f.part2BoxJ())
 
   l8bd = (): number =>
     sumFields(this.l8f8949s().map((f) => f.longTermTotalProceeds()))
@@ -154,7 +166,10 @@ export default class ScheduleD extends F1040Attachment {
   l8bh = (): number =>
     sumFields(this.l8f8949s().map((f) => f.longTermTotalGain()))
 
-  l9f8949s = (): F8949[] => this.f1040.f8949s.filter((f) => f.part2BoxE())
+  // The printed line takes both boxes: securities on a 1099-B and
+  // digital assets on a 1099-DA.
+  l9f8949s = (): F8949[] =>
+    this.f1040.f8949s.filter((f) => f.part2BoxE() || f.part2BoxK())
 
   l9d = (): number =>
     sumFields(this.l9f8949s().map((f) => f.longTermTotalProceeds()))
@@ -168,7 +183,10 @@ export default class ScheduleD extends F1040Attachment {
   l9h = (): number =>
     sumFields(this.l9f8949s().map((f) => f.longTermTotalGain()))
 
-  l10f8949s = (): F8949[] => this.f1040.f8949s.filter((f) => f.part2BoxF())
+  // The printed line takes both boxes: securities on a 1099-B and
+  // digital assets on a 1099-DA.
+  l10f8949s = (): F8949[] =>
+    this.f1040.f8949s.filter((f) => f.part2BoxF() || f.part2BoxL())
 
   l10d = (): number =>
     sumFields(this.l10f8949s().map((f) => f.longTermTotalProceeds()))

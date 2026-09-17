@@ -6,7 +6,8 @@ import {
   PersonRole,
   PlanType1099,
   IraPlanType,
-  Asset
+  Asset,
+  Form8949Row
 } from 'ustaxes/core/data'
 import federalBrackets from '../data/federal'
 import { F1040_FIELDS } from '../fieldMaps'
@@ -161,10 +162,17 @@ export default class F1040 extends F1040Base {
   socialSecurityBenefitsWorksheet?: SocialSecurityBenefitsWorksheet
 
   qualifyingDependents: QualifyingDependents
+  /** Form 8949 rows a broker reported, beside the portfolio `assets`. */
+  form8949Rows: Form8949Row<Date>[]
 
-  constructor(info: ValidatedInformation, assets: Asset<Date>[]) {
+  constructor(
+    info: ValidatedInformation,
+    assets: Asset<Date>[],
+    form8949Rows: Form8949Row<Date>[] = []
+  ) {
     super(info)
     this.assets = assets
+    this.form8949Rows = form8949Rows
     // Form 6251 must see the same worksheet even before 1040 line 16 is read.
     this.qualifiedAndCapGainsWorksheet = new SDQualifiedAndCapGains(this)
     this.qualifyingDependents = new QualifyingDependents(this)

@@ -405,10 +405,31 @@ export function calculationSnapshot(f: F1040) {
             '1ad': f.scheduleD.l1ad() ?? null,
             '1ae': f.scheduleD.l1ae() ?? null,
             '1ah': f.scheduleD.l1ah(),
+            // Lines 1b, 2 and 3: the Form 8949 totals by the box checked at
+            // the top of each Part I — v14.
+            '1bd': f.scheduleD.l1bd(),
+            '1be': f.scheduleD.l1be(),
+            '1bh': f.scheduleD.l1bh(),
+            '2d': f.scheduleD.l2d(),
+            '2e': f.scheduleD.l2e(),
+            '2h': f.scheduleD.l2h(),
+            '3d': f.scheduleD.l3d(),
+            '3e': f.scheduleD.l3e(),
+            '3h': f.scheduleD.l3h(),
             '7': f.scheduleD.l7(),
             '8ad': f.scheduleD.l8ad() ?? null,
             '8ae': f.scheduleD.l8ae() ?? null,
             '8ah': f.scheduleD.l8ah() ?? null,
+            // Lines 8b, 9 and 10: the same three boxes of Part II — v14.
+            '8bd': f.scheduleD.l8bd(),
+            '8be': f.scheduleD.l8be(),
+            '8bh': f.scheduleD.l8bh(),
+            '9d': f.scheduleD.l9d(),
+            '9e': f.scheduleD.l9e(),
+            '9h': f.scheduleD.l9h(),
+            '10d': f.scheduleD.l10d(),
+            '10e': f.scheduleD.l10e(),
+            '10h': f.scheduleD.l10h(),
             '13': f.scheduleD.l13() ?? null,
             '15': f.scheduleD.l15(),
             '16': f.scheduleD.l16(),
@@ -967,6 +988,51 @@ export function calculationSnapshot(f: F1040) {
     mfsLivedApartAllYear: f.l6d(),
     actcDeclined: f.actcDeclined()
   }
+  /**
+   * Form 8949 as printed: one entry per part, in copy order, with the box
+   * checked at its top, its rows and its line 2 totals (v14). Rows are the
+   * printed whole-dollar entries, so a reader can add them up and get the
+   * totals, as the form's own arithmetic does.
+   */
+  const form8949 = !f.f8949.isNeeded()
+    ? null
+    : f.f8949s.flatMap((copy, index) =>
+        (
+          [
+            ['I', copy.shortTermPart()],
+            ['II', copy.longTermPart()]
+          ] as const
+        ).flatMap(([part, printed]) =>
+          printed === undefined
+            ? []
+            : [
+                {
+                  copy: index,
+                  part,
+                  box: printed.category,
+                  rows: printed.rows.map((r) => ({
+                    description: r.description,
+                    acquired: r.acquired,
+                    sold: r.sold,
+                    proceeds: r.proceeds,
+                    costBasis: r.costBasis,
+                    gain: r.gain
+                  })),
+                  totals: {
+                    proceeds: printed.rows.reduce(
+                      (acc, r) => acc + r.proceeds,
+                      0
+                    ),
+                    costBasis: printed.rows.reduce(
+                      (acc, r) => acc + r.costBasis,
+                      0
+                    ),
+                    gain: printed.rows.reduce((acc, r) => acc + r.gain, 0)
+                  }
+                }
+              ]
+        )
+      )
   return {
     schemaVersion: 'ustaxes-1040-line-snapshot-v14',
     taxYear: 2025,
@@ -974,6 +1040,7 @@ export function calculationSnapshot(f: F1040) {
     lines,
     attachments,
     worksheets,
+    form8949,
     indicators
   }
 }
