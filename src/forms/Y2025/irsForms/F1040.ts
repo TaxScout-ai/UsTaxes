@@ -782,13 +782,21 @@ export default class F1040 extends F1040Base {
         f.form.planType === PlanType1099.Pension &&
         /[GH]/.test(f.form.distributionCode ?? '')
     )
-  // The sum of box 5 from SSA-1099
-  l6a = (): number | undefined => this.socialSecurityBenefitsWorksheet?.l1()
-  // calculation of the taxable amount of line 6a based on other income
+  // Line 6a: the total of box 5 of every SSA-1099, 0 when repayments exceed
+  // the benefits (Pub. 915).
+  l6a = (): number | undefined => this.socialSecurityBenefitsWorksheet?.line6a()
+  // Line 6b: the taxable part from the Social Security Benefits Worksheet.
   l6b = (): number | undefined =>
     this.socialSecurityBenefitsWorksheet?.taxableAmount()
-  // TODO: change this so that it is not hard coded
+  // Line 6c: the lump-sum election (Pub. 915) is not modelled; never checked.
   l6c = (): boolean => false
+  /**
+   * Line 6d: married filing separately and lived apart from the spouse for
+   * all of 2025 (2025 Instructions for Form 1040, line 6d).
+   */
+  l6d = (): boolean =>
+    this.info.taxPayer.filingStatus === FilingStatus.MFS &&
+    this.info.questions.LIVE_APART_FROM_SPOUSE === true
   l7Box = (): boolean => !this.scheduleD.isNeeded()
   l7 = (): number | undefined => this.scheduleD.to1040()
   l8 = (): number | undefined => this.schedule1.l10()
@@ -1135,6 +1143,8 @@ export default class F1040 extends F1040Base {
     set('line_5c_rollover', this.l5cRollover())
     set('line_6a', this.l6a())
     set('line_6b', this.l6b())
+    set('line_6c_lump_sum', this.l6c())
+    set('line_6d_lived_apart', this.l6d())
     set('line_7', this.l7())
     set('line_8', this.l8())
     set('line_9', this.l9())

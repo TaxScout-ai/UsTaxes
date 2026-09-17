@@ -92,6 +92,8 @@ export const F1040_FIELDS: Record<string, string> = {
   line_5c_other: 'c1_40',
   line_6a: 'f1_68',
   line_6b: 'f1_69',
+  line_6c_lump_sum: 'c1_41',
+  line_6d_lived_apart: 'c1_42',
   line_7: 'f1_70',
   line_8: 'f1_72',
   line_9: 'f1_73',
