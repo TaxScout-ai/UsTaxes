@@ -833,24 +833,24 @@ export function calculationSnapshot(f: F1040) {
         ? null
         : {
             lines: {
-              '1': ss.l1(),
-              '2': ss.l2(),
-              '3': ss.l3(),
+              '1': ss.l1() ?? null,
+              '2': ss.l2() ?? null,
+              '3': ss.l3() ?? null,
               '4': ss.l4() ?? null,
-              '5': ss.l5(),
-              '6': ss.l6(),
-              '7': ss.l7(),
-              '8': ss.l8(),
-              '9': ss.l9(),
-              '10': ss.l10(),
-              '11': ss.l11(),
-              '12': ss.l12(),
-              '13': ss.l13(),
-              '14': ss.l14(),
-              '15': ss.l15(),
-              '16': ss.l16(),
-              '17': ss.l17(),
-              '18': ss.l18(),
+              '5': ss.l5() ?? null,
+              '6': ss.l6() ?? null,
+              '7': ss.l7() ?? null,
+              '8': ss.l8() ?? null,
+              '9': ss.l9() ?? null,
+              '10': ss.l10() ?? null,
+              '11': ss.l11() ?? null,
+              '12': ss.l12() ?? null,
+              '13': ss.l13() ?? null,
+              '14': ss.l14() ?? null,
+              '15': ss.l15() ?? null,
+              '16': ss.l16() ?? null,
+              '17': ss.l17() ?? null,
+              '18': ss.l18() ?? null,
               taxable: ss.taxableAmount()
             } as Lines
           },
@@ -907,10 +907,12 @@ export function calculationSnapshot(f: F1040) {
     eicDeclined: f.eicDeclined(),
     /** Line 5c box 1: a rollover from a qualified employer's plan (1099-R code G or H). */
     pensionsRollover: f.l5cRollover(),
+    /** Line 6d: married filing separately, lived apart from the spouse all year (v13). */
+    mfsLivedApartAllYear: f.l6d(),
     actcDeclined: f.actcDeclined()
   }
   return {
-    schemaVersion: 'ustaxes-1040-line-snapshot-v12',
+    schemaVersion: 'ustaxes-1040-line-snapshot-v13',
     taxYear: 2025,
     form: '1040',
     lines,
