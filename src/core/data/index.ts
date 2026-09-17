@@ -1183,6 +1183,9 @@ export interface Form8606Data {
   personRole: PersonRole.PRIMARY | PersonRole.SPOUSE
   // Part I: Nondeductible Contributions
   nondeductibleContributions: number // Line 1
+  // Line 4 — the part of line 1 made from January 1 through April 15 of the
+  // following year
+  contributionsMadeInFollowingYear?: number
   totalBasisPriorYears: number // Line 2 — basis from prior years
   // Part II: Conversions & Distributions
   amountConverted: number // Line 8 — net amount converted to Roth

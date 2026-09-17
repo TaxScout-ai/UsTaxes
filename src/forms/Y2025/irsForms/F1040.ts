@@ -738,13 +738,22 @@ export default class F1040 extends F1040Base {
       )
     return fullyTaxable ? undefined : this.totalGrossDistributionsFromIra()
   }
-  // Taxable IRA distributions. If Form 8606 is filed, use its calculation
-  // (accounts for nontaxable basis); otherwise use 1099-R box 2a.
+  // Taxable IRA distributions. A person who files Form 8606 takes lines 15c,
+  // 18 and 25c from it (the basis is nontaxable); everyone else's IRAs keep
+  // 1099-R box 2a. A spouse without Form 8606 must not vanish from line 4b
+  // because the other spouse files one (TAX-4862).
   l4b = (): number | undefined => {
-    if (this._f8606List && this._f8606List.length > 0) {
-      return this._f8606List.reduce((sum, f) => sum + f.taxableAmount(), 0)
-    }
-    return this.totalTaxableFromIra()
+    const forms = this._f8606List ?? []
+    if (forms.length === 0) return this.totalTaxableFromIra()
+    const filers = new Set(forms.map((f) => f.data.personRole))
+    return (
+      sumToWholeDollars(
+        this.info.individualRetirementArrangements
+          .filter((i) => !filers.has(i.personRole))
+          .map((i) => i.taxableAmount),
+        'Form 1040 line 4b'
+      ) + forms.reduce((sum, f) => sum + f.taxableAmount(), 0)
+    )
   }
   // This is the value of box 1 in 1099-R forms coming from pensions/annuities
   l5a = (): number | undefined =>

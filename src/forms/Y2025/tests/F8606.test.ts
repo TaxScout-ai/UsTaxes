@@ -16,7 +16,7 @@ describe('F8606', () => {
     await testKit.with1040Assert(async (forms, info) => {
       const f8606s = forms.filter((f) => f.tag === 'f8606') as F8606[]
       for (const f of f8606s) {
-        expect(f.l13()).toBeLessThanOrEqual(f.l7() + f.l8())
+        expect(f.l13() ?? 0).toBeLessThanOrEqual((f.l7() ?? 0) + (f.l8() ?? 0))
       }
     })
   })
