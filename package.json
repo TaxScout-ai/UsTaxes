@@ -42,7 +42,7 @@
     "start": "node ./notice.js && ts-node ./scripts/env.ts && ts-node ./scripts/setup.ts && concurrently npm:dev",
     "dev": "craco start",
     "build": "ts-node ./scripts/env.ts && ts-node ./scripts/setup.ts && craco build",
-    "test": "ts-node ./scripts/env.ts && ts-node ./scripts/setup.ts && craco test",
+    "test": "ts-node ./scripts/env.ts && ts-node ./scripts/setup.ts && craco test --maxWorkers=4",
     "eject": "craco eject",
     "desktop-release": "tauri build",
     "desktop": "tauri dev",
