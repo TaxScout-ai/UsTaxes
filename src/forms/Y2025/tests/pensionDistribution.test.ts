@@ -178,7 +178,8 @@ describe('pension distributions on Form 1040', () => {
     const f = formFor({
       iras: [ira('Liberty Trust Company', 12_000, 12_000, 2_555)]
     })
-    expect(f.l4a()).toBe(12_000)
+    // Fully taxable: line 4b only, line 4a blank (TAX-4861).
+    expect(f.l4a()).toBeUndefined()
     expect(f.l4b()).toBe(12_000)
     expect(f.l25b()).toBe(2_555)
   })
@@ -224,12 +225,102 @@ describe('pension distributions on Form 1040', () => {
       iras: [ira('Liberty Trust Company', 12_000, 12_000, 0)]
     })
     const { lines } = calculationSnapshot(f)
-    expect(lines['4a']).toBe(12_000)
+    expect(lines['4a']).toBeNull()
     expect(lines['4b']).toBe(12_000)
     expect(lines['5a']).toBe(53_778)
     expect(lines['5b']).toBe(43_100)
     expect(lines['25b']).toBe(3_405)
     // Line 9 in the snapshot must be the sum a replay can rebuild.
     expect(lines['9']).toBe(12_000 + 43_100)
+  })
+})
+
+describe('lines 4a and 5c as the 2025 instructions require (TAX-4861)', () => {
+  it('leaves line 4a blank when every IRA distribution is fully taxable', () => {
+    const f = formFor({
+      iras: [ira('Synthetic IRA Custodian', 12_000, 12_000, 1_200)]
+    })
+    expect(f.l4a()).toBeUndefined()
+    expect(f.l4b()).toBe(12_000)
+    expect(calculationSnapshot(f).lines['4a']).toBeNull()
+  })
+
+  it('enters line 4a once any IRA distribution is not fully taxable', () => {
+    const f = formFor({
+      iras: [
+        ira('Synthetic IRA Custodian', 12_000, 12_000, 1_200),
+        {
+          ...ira('Synthetic Roth Custodian', 5_000, 0, 0),
+          planType: IraPlanType.RothIRA
+        }
+      ]
+    })
+    expect(f.l4a()).toBe(17_000)
+    expect(f.l4b()).toBe(12_000)
+  })
+
+  it('keeps line 4a for a Roth distribution even when its taxable amount equals the gross', () => {
+    const f = formFor({
+      iras: [
+        {
+          ...ira('Synthetic Roth Custodian', 3_000, 3_000, 0),
+          planType: IraPlanType.RothIRA
+        }
+      ]
+    })
+    expect(f.l4a()).toBe(3_000)
+  })
+
+  it.each([
+    ['7', false],
+    ['G', true],
+    ['H', true],
+    ['2', false],
+    ['4', false]
+  ])('checks line 5c box 1 for pension code %s: %s', (code, expected) => {
+    const f = formFor({
+      f1099s: [
+        pension(
+          'Synthetic Plan',
+          10_000,
+          code === 'G' || code === 'H' ? 0 : 10_000,
+          0,
+          code
+        )
+      ]
+    })
+    expect(f.l5cRollover()).toBe(expected)
+    expect(calculationSnapshot(f).indicators.pensionsRollover).toBe(expected)
+    expect(f.namedFields()['c1_38']).toBe(expected)
+  })
+
+  it('does not check line 5c for a rollover code on an IRA distribution', () => {
+    const f = formFor({
+      iras: [ira('Synthetic IRA Custodian', 12_000, 12_000, 0)]
+    })
+    expect(f.l5cRollover()).toBe(false)
+  })
+})
+
+describe('distribution lines add cents before rounding (TAX-4861)', () => {
+  it('rounds lines 4b, 5a and 5b once, after summing each document', () => {
+    const f = formFor({
+      iras: [
+        ira('Synthetic IRA Custodian', 12_000.4, 12_000.4, 0),
+        ira('Synthetic SEP Custodian', 3_500.35, 3_500.35, 0)
+      ],
+      f1099s: [
+        pension('Synthetic Survivor Plan', 8_000.5, 6_000.25, 0, '4'),
+        pension('Synthetic Disability Plan', 9_000, 9_000, 0, '3'),
+        pension('Synthetic 401k Plan', 40_000, 0, 0, 'G')
+      ]
+    })
+    // Rounding each document first would give 12,000 + 3,500 = 15,500 and
+    // 8,001 + 9,000 + 40,000 = 57,001 / 6,000 + 9,000 = 15,000.
+    expect(f.l4a()).toBeUndefined()
+    expect(f.l4b()).toBe(15_501)
+    expect(f.l5a()).toBe(57_001)
+    expect(f.l5b()).toBe(15_000)
+    expect(Number.isInteger(calculationSnapshot(f).lines['9'])).toBe(true)
   })
 })

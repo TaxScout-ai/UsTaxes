@@ -5,6 +5,7 @@ import {
   IncomeW2,
   PersonRole,
   PlanType1099,
+  IraPlanType,
   Asset
 } from 'ustaxes/core/data'
 import federalBrackets from '../data/federal'
@@ -655,27 +656,37 @@ export default class F1040 extends F1040Base {
       'Form 1099-DIV box 1b'
     )
 
+  // Form lines add the cents of every document first and round the total
+  // once (2025 Instructions for Form 1040, "Rounding Off to Whole Dollars").
   totalGrossDistributionsFromIra = (): number =>
-    this.info.individualRetirementArrangements.reduce(
-      (res, i) => res + i.grossDistribution,
-      0
+    sumToWholeDollars(
+      this.info.individualRetirementArrangements.map(
+        (i) => i.grossDistribution
+      ),
+      'Form 1040 line 4a'
     )
 
   totalTaxableFromIra = (): number =>
-    this.info.individualRetirementArrangements.reduce(
-      (r, i) => r + i.taxableAmount,
-      0
+    sumToWholeDollars(
+      this.info.individualRetirementArrangements.map((i) => i.taxableAmount),
+      'Form 1040 line 4b'
     )
 
   totalGrossDistributionsFrom1099R = (planType: PlanType1099): number =>
-    this.f1099rs()
-      .filter((element) => element.form.planType === planType)
-      .reduce((res, f1099) => res + f1099.form.grossDistribution, 0)
+    sumToWholeDollars(
+      this.f1099rs()
+        .filter((element) => element.form.planType === planType)
+        .map((f1099) => f1099.form.grossDistribution),
+      'Form 1040 line 5a'
+    )
 
   totalTaxableFrom1099R = (planType: PlanType1099): number =>
-    this.f1099rs()
-      .filter((element) => element.form.planType === planType)
-      .reduce((res, f1099) => res + f1099.form.taxableAmount, 0)
+    sumToWholeDollars(
+      this.f1099rs()
+        .filter((element) => element.form.planType === planType)
+        .map((f1099) => f1099.form.taxableAmount),
+      'Form 1040 line 5b'
+    )
 
   l1a = (): number => this.wages()
   l1b = (): number | undefined => this.info.householdEmployeeIncome ?? undefined
@@ -708,8 +719,25 @@ export default class F1040 extends F1040Base {
   l2b = (): number | undefined => this.scheduleB.to1040l2b()
   l3a = (): number | undefined => this.totalQualifiedDividends()
   l3b = (): number | undefined => this.scheduleB.to1040l3b()
-  // This is the value of box 1 in 1099-R forms coming from IRAs
-  l4a = (): number | undefined => this.totalGrossDistributionsFromIra()
+  // This is the value of box 1 in 1099-R forms coming from IRAs.
+  // "If the distribution from your IRA is fully taxable, enter the total
+  // distribution on line 4b; don't make an entry on line 4a" (2025
+  // Instructions for Form 1040, lines 4a and 4b). Line 4a stays blank when
+  // every distribution is a non-Roth one taxed in full and no Form 8606
+  // figures a basis.
+  l4a = (): number | undefined => {
+    const iras = this.info.individualRetirementArrangements
+    const fullyTaxable =
+      iras.length > 0 &&
+      !(this._f8606List && this._f8606List.length > 0) &&
+      iras.every(
+        (i) =>
+          i.planType !== IraPlanType.RothIRA &&
+          i.grossDistribution > 0 &&
+          i.taxableAmount === i.grossDistribution
+      )
+    return fullyTaxable ? undefined : this.totalGrossDistributionsFromIra()
+  }
   // Taxable IRA distributions. If Form 8606 is filed, use its calculation
   // (accounts for nontaxable basis); otherwise use 1099-R box 2a.
   l4b = (): number | undefined => {
@@ -728,17 +756,32 @@ export default class F1040 extends F1040Base {
       (f) => f.form.planType === PlanType1099.Pension
     )
     if (pensions.length === 0) return undefined
-    return pensions.reduce((sum, f) => {
-      if (f.form.taxableAmountNotDetermined && f.form.simplifiedMethodData) {
-        const ws = new SimplifiedMethodWorksheet(
-          f.form.grossDistribution,
-          f.form.simplifiedMethodData
-        )
-        return sum + ws.taxableAmount()
-      }
-      return sum + f.form.taxableAmount
-    }, 0)
+    return sumToWholeDollars(
+      pensions.map((f) =>
+        f.form.taxableAmountNotDetermined && f.form.simplifiedMethodData
+          ? // The worksheet divides; carry its result in cents.
+            Math.round(
+              new SimplifiedMethodWorksheet(
+                f.form.grossDistribution,
+                f.form.simplifiedMethodData
+              ).taxableAmount() * 100
+            ) / 100
+          : f.form.taxableAmount
+      ),
+      'Form 1040 line 5b'
+    )
   }
+  /**
+   * Line 5c box 1: a rollover, including a direct rollover, from a qualified
+   * employer's plan (2025 Instructions for Form 1040, line 5c). Form 1099-R
+   * box 7 code G is a direct rollover and H a designated Roth direct rollover.
+   */
+  l5cRollover = (): boolean =>
+    this.f1099rs().some(
+      (f) =>
+        f.form.planType === PlanType1099.Pension &&
+        /[GH]/.test(f.form.distributionCode ?? '')
+    )
   // The sum of box 5 from SSA-1099
   l6a = (): number | undefined => this.socialSecurityBenefitsWorksheet?.l1()
   // calculation of the taxable amount of line 6a based on other income
@@ -1089,6 +1132,7 @@ export default class F1040 extends F1040Base {
     set('line_4b', this.l4b())
     set('line_5a', this.l5a())
     set('line_5b', this.l5b())
+    set('line_5c_rollover', this.l5cRollover())
     set('line_6a', this.l6a())
     set('line_6b', this.l6b())
     set('line_7', this.l7())
