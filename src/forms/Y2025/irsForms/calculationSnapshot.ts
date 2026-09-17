@@ -50,10 +50,19 @@ type Lines = Record<string, number | null>
  * it): lines 2–4 and 6, the Part III answers as 1/0, and the number of
  * interest and dividend payers the schedule lists.
  *
- * v13 adds Form 8606 (the first copy): Part I lines 1–15c with line 10 in
- * thousandths, the question between lines 3 and 4 as 1/0 (`3q`), Part II
- * lines 16–18 and Part III lines 19–25c; a line the form leaves blank is
- * `null` (TAX-4862).
+ * v13 was published twice: once for the Social Security Benefits Worksheet in
+ * whole dollars with the skipped lines as `null` and
+ * `indicators.mfsLivedApartAllYear` (TAX-4863), and once for Form 8606
+ * (TAX-4862). Both landed, so a reader of a v13 snapshot cannot tell which of
+ * the two it carries.
+ *
+ * v14 is the first version that unambiguously carries both. It adds nothing of
+ * its own; it names what v13 came to mean after both changes merged:
+ * - the Social Security worksheet lines as whole dollars, `null` for a line
+ *   the worksheet skips, and `indicators.mfsLivedApartAllYear`;
+ * - Form 8606 (the first copy): Part I lines 1–15c with line 10 in
+ *   thousandths, the question between lines 3 and 4 as 1/0 (`3q`), Part II
+ *   lines 16–18 and Part III lines 19–25c, a blank line as `null`.
  */
 const yesNo = (v: boolean | undefined): number | null =>
   v === undefined ? null : v ? 1 : 0
@@ -959,7 +968,7 @@ export function calculationSnapshot(f: F1040) {
     actcDeclined: f.actcDeclined()
   }
   return {
-    schemaVersion: 'ustaxes-1040-line-snapshot-v13',
+    schemaVersion: 'ustaxes-1040-line-snapshot-v14',
     taxYear: 2025,
     form: '1040',
     lines,
