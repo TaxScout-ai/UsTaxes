@@ -200,6 +200,45 @@ export function validateCalculationRequest(raw: unknown): ContractIssue[] {
         '/information/extensionPaymentAmount',
         'Amount paid with extension'
       )
+    // Form 8606 lines 1, 2, 4, 6, 7, 8, 19 and 22 are stated amounts; each
+    // person files at most one (TAX-4862).
+    if (Array.isArray(normalized.form8606s)) {
+      const roles = new Set<unknown>()
+      for (const [i, form] of normalized.form8606s.entries()) {
+        if (!object(form)) continue
+        const path = `/information/form8606s/${i}`
+        if (roles.has(form.personRole))
+          issue(
+            `${path}/personRole`,
+            'invalid_input',
+            'Each person files at most one Form 8606'
+          )
+        roles.add(form.personRole)
+        for (const key of [
+          'nondeductibleContributions',
+          'contributionsMadeInFollowingYear',
+          'totalBasisPriorYears',
+          'valueOfAllTraditionalIRAs',
+          'distributionsFromTraditional',
+          'amountConverted',
+          'rothDistributions',
+          'rothContributionBasis'
+        ])
+          if (form[key] !== undefined)
+            payment(form[key], `${path}/${key}`, `Form 8606 ${key}`)
+        if (
+          typeof form.contributionsMadeInFollowingYear === 'number' &&
+          typeof form.nondeductibleContributions === 'number' &&
+          form.contributionsMadeInFollowingYear >
+            form.nondeductibleContributions
+        )
+          issue(
+            `${path}/contributionsMadeInFollowingYear`,
+            'invalid_input',
+            'Line 4 is part of line 1 and cannot exceed it'
+          )
+      }
+    }
   }
   return issues
 }

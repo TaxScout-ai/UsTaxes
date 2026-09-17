@@ -49,6 +49,11 @@ type Lines = Record<string, number | null>
  * v10 adds Form 1040 lines 2a and 3a and Schedule B (when the return files
  * it): lines 2–4 and 6, the Part III answers as 1/0, and the number of
  * interest and dividend payers the schedule lists.
+ *
+ * v13 adds Form 8606 (the first copy): Part I lines 1–15c with line 10 in
+ * thousandths, the question between lines 3 and 4 as 1/0 (`3q`), Part II
+ * lines 16–18 and Part III lines 19–25c; a line the form leaves blank is
+ * `null` (TAX-4862).
  */
 const yesNo = (v: boolean | undefined): number | null =>
   v === undefined ? null : v ? 1 : 0
@@ -564,6 +569,48 @@ export function calculationSnapshot(f: F1040) {
             '18': yesNo(f.scheduleA.l18())
           } as Lines
         },
+    form8606:
+      f.f8606List.length === 0
+        ? null
+        : (() => {
+            const [h] = f.f8606List
+            const n = (v: number | undefined): number | null => v ?? null
+            return {
+              lines: {
+                '1': h.l1(),
+                '2': h.l2(),
+                '3': h.l3(),
+                '3q': h.tookDistributionOrConverted() ? 1 : 0,
+                '4': n(h.l4()),
+                '5': n(h.l5()),
+                '6': n(h.l6()),
+                '7': n(h.l7()),
+                '8': n(h.l8()),
+                '9': n(h.l9()),
+                '10': n(h.l10Thousandths()),
+                '11': n(h.l11()),
+                '12': n(h.l12()),
+                '13': n(h.l13()),
+                '14': h.l14(),
+                '15a': n(h.l15a()),
+                '15b': n(h.l15b()),
+                '15c': n(h.l15c()),
+                '16': n(h.l16()),
+                '17': n(h.l17()),
+                '18': n(h.l18()),
+                '19': n(h.l19()),
+                '20': n(h.l20()),
+                '21': n(h.l21()),
+                '22': n(h.l22()),
+                '23': n(h.l23()),
+                '24': n(h.l24()),
+                '25a': n(h.l25a()),
+                '25b': n(h.l25b()),
+                '25c': n(h.l25c())
+              } as Lines,
+              copies: f.f8606List.length
+            }
+          })(),
     scheduleB: !f.scheduleB.isNeeded()
       ? null
       : {
