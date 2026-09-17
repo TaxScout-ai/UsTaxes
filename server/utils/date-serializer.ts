@@ -1,4 +1,4 @@
-import { Information, Asset } from 'ustaxes/core/data'
+import { Information, Asset, Form8949Row } from 'ustaxes/core/data'
 
 /**
  * Converts ISO date strings in the incoming JSON payload
@@ -79,5 +79,16 @@ export function deserializeAssets(raw: Array<Asset<string>>): Asset<Date>[] {
     openDate: toDate(asset.openDate) as Date,
     closeDate: toDate(asset.closeDate),
     giftedDate: toDate(asset.giftedDate)
+  }))
+}
+
+/** Form 8949 rows carry column (b) and (c) dates; column (b) may be a code. */
+export function deserializeForm8949Rows(
+  raw: Array<Form8949Row<string>>
+): Form8949Row<Date>[] {
+  return (raw ?? []).map((row) => ({
+    ...row,
+    acquiredDate: toDate(row.acquiredDate),
+    soldDate: toDate(row.soldDate) as Date
   }))
 }

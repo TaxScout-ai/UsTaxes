@@ -24,7 +24,7 @@ async function generatePdf(req: Request, res: Response): Promise<void> {
       })
       return
     }
-    const { taxYear, information, assets } = parsed.value
+    const { taxYear, information, assets, form8949Rows } = parsed.value
 
     const contractIssues = validateForm8863Contract(req.body)
     if (contractIssues.length > 0) {
@@ -37,7 +37,7 @@ async function generatePdf(req: Request, res: Response): Promise<void> {
       return
     }
 
-    const builder = buildYearForm(taxYear, information, assets)
+    const builder = buildYearForm(taxYear, information, assets, form8949Rows)
     const bytesResult = await builder.f1040Bytes()
 
     if (isLeft(bytesResult)) {

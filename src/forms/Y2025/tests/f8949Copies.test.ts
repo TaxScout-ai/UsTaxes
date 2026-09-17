@@ -3,9 +3,13 @@ import { Asset } from 'ustaxes/core/data'
 import { rehearsalInformation } from './fixtures/atsRehearsal'
 
 /**
- * Form 8949 prints 14 sales in Part I and 14 in Part II; more continue on
- * another copy. The copy count had the Schedule B off-by-one (TAX-4847): a
- * full part produced an empty second copy.
+ * The TY2025 Form 8949 prints **eleven** rows in Part I and eleven in Part II;
+ * more continue on another copy. This file asserted fourteen, the count of an
+ * older form: the PDF we ship has eleven row lines per part (f1_03–f1_90 in
+ * eight columns), so a twelfth row had nowhere to print (TAX-4953).
+ *
+ * The copy count had the Schedule B off-by-one (TAX-4847): a full part
+ * produced an empty second copy.
  */
 const sales = (count: number, longTerm: boolean): Asset<Date>[] =>
   Array.from({ length: count }, (_, i) => ({
@@ -33,13 +37,13 @@ const copies = (short: number, long: number): number =>
 describe('Form 8949 copies', () => {
   it.each([
     [1, 0, 1],
-    [14, 0, 1],
-    [15, 0, 2],
-    [28, 0, 2],
-    [29, 0, 3],
-    [0, 14, 1],
-    [14, 14, 1],
-    [14, 15, 2]
+    [11, 0, 1],
+    [12, 0, 2],
+    [22, 0, 2],
+    [23, 0, 3],
+    [0, 11, 1],
+    [11, 11, 1],
+    [11, 12, 2]
   ])('%i short-term and %i long-term sales file %i copies', (s, l, n) => {
     expect(copies(s, l)).toBe(n)
   })

@@ -1,5 +1,5 @@
 import { Field } from 'ustaxes/core/pdfFiller'
-import { Information, Asset } from 'ustaxes/core/data'
+import { Information, Asset, Form8949Row } from 'ustaxes/core/data'
 import { Either, isLeft, isRight, left, run, runAsync } from 'ustaxes/core/util'
 import { TaxYear } from 'ustaxes/core/data'
 import { create1040 as create1040For2020 } from 'ustaxes/forms/Y2020/irsForms/Main'
@@ -43,7 +43,8 @@ import { validate } from './F1040Base'
 interface CreateFormConfig {
   createF1040: (
     info: Information,
-    assets: Asset[]
+    assets: Asset[],
+    form8949Rows?: Form8949Row<Date>[]
   ) => Either<F1040Error[], Form[]>
   getPDF: (f: Form) => Promise<PDFDocument>
   getStatePDF: (f: StateForm) => Promise<PDFDocument>
@@ -56,17 +57,21 @@ export class YearCreateForm {
   year: TaxYear
   unvalidatedInfo: Information
   assets: Asset[]
+  /** Form 8949 rows as a broker reported them (TY2025 only). */
+  form8949Rows: Form8949Row<Date>[]
   config: CreateFormConfig
 
   constructor(
     year: TaxYear,
     info: Information,
     assets: Asset[],
-    config: CreateFormConfig
+    config: CreateFormConfig,
+    form8949Rows: Form8949Row<Date>[] = []
   ) {
     this.year = year
     this.unvalidatedInfo = info
     this.assets = assets
+    this.form8949Rows = form8949Rows
 
     this.config = config
   }
@@ -78,7 +83,9 @@ export class YearCreateForm {
 
   f1040 = (): Either<F1040Error[], Form[]> =>
     run(validate(this.unvalidatedInfo))
-      .chain((info) => this.config.createF1040(info, this.assets))
+      .chain((info) =>
+        this.config.createF1040(info, this.assets, this.form8949Rows)
+      )
       .value()
 
   f1040Pdfs = async (): Promise<Either<string[], PDFDocument[]>> => {
@@ -188,13 +195,20 @@ export class CreateForms {
     return this
   }
 
-  build = (info: Information, assets: Asset<Date>[]): YearCreateForm => {
+  build = (
+    info: Information,
+    assets: Asset<Date>[],
+    form8949Rows: Form8949Row<Date>[] = []
+  ): YearCreateForm => {
+    // Every argument is forwarded: a year that takes Form 8949 rows as its
+    // third argument got `undefined` while the /api/calculate route passed
+    // them, so the PDF and the snapshot disagreed (TAX-4953).
     const takeSecond =
-      <A, AA, E, B, C>(
-        f: (a: A, aa: AA) => Either<E, [B, C]>
-      ): ((a: A, aa: AA) => Either<E, C>) =>
-      (a: A, aa: AA): Either<E, C> =>
-        run(f(a, aa))
+      <A, AA, AAA, E, B, C>(
+        f: (a: A, aa: AA, aaa?: AAA) => Either<E, [B, C]>
+      ): ((a: A, aa: AA, aaa?: AAA) => Either<E, C>) =>
+      (a: A, aa: AA, aaa?: AAA): Either<E, C> =>
+        run(f(a, aa, aaa))
           .map(([, c]) => c)
           .value()
 
@@ -249,7 +263,13 @@ export class CreateForms {
       }
     }
 
-    return new YearCreateForm(this.year, info, assets, configs[this.year])
+    return new YearCreateForm(
+      this.year,
+      info,
+      assets,
+      configs[this.year],
+      form8949Rows
+    )
   }
 }
 
@@ -259,5 +279,6 @@ export const yearFormBuilder = (year: TaxYear): CreateForms =>
 export default (
   year: TaxYear,
   info: Information,
-  assets: Asset<Date>[]
-): YearCreateForm => yearFormBuilder(year).build(info, assets)
+  assets: Asset<Date>[],
+  form8949Rows: Form8949Row<Date>[] = []
+): YearCreateForm => yearFormBuilder(year).build(info, assets, form8949Rows)

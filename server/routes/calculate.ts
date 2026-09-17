@@ -8,13 +8,15 @@ import { Router, Request, Response } from 'express'
 import {
   Information,
   Asset,
+  Form8949Row,
   TaxYear,
   USTAXES_HTTP_CONTRACT_VERSION
 } from 'ustaxes/core/data'
 import { Either, run } from 'ustaxes/core/util'
 import {
   deserializeInformation,
-  deserializeAssets
+  deserializeAssets,
+  deserializeForm8949Rows
 } from '../utils/date-serializer'
 import { yearFormBuilder } from 'ustaxes/forms/YearForms'
 import { createPdfDownloader } from '../utils/pdf-downloader'
@@ -84,7 +86,8 @@ function extractSummary(f1040: unknown, forms: Form[]) {
 function calculateForYear(
   taxYear: TaxYear,
   information: Information<Date>,
-  assets: Asset<Date>[]
+  assets: Asset<Date>[],
+  form8949Rows: Form8949Row<Date>[]
 ):
   | {
       success: true
@@ -111,7 +114,7 @@ function calculateForYear(
       result = create1040For2024(information, assets)
       break
     case 'Y2025':
-      result = create1040For2025(information, assets)
+      result = create1040For2025(information, assets, form8949Rows)
       break
     case 'Y2026':
       result = create1040For2026(information, assets)
@@ -140,7 +143,12 @@ router.post('/api/calculate', (req: Request, res: Response) => {
       })
       return
     }
-    const { taxYear, information: rawInfo, assets: rawAssets } = parsed.value
+    const {
+      taxYear,
+      information: rawInfo,
+      assets: rawAssets,
+      form8949Rows: rawForm8949Rows
+    } = parsed.value
 
     const contractIssues = validateForm8863Contract(req.body)
     if (contractIssues.length > 0) {
@@ -155,7 +163,12 @@ router.post('/api/calculate', (req: Request, res: Response) => {
 
     const information = deserializeInformation(rawInfo)
     const assets = deserializeAssets(rawAssets)
-    const response = calculateForYear(taxYear, information, assets)
+    const response = calculateForYear(
+      taxYear,
+      information,
+      assets,
+      deserializeForm8949Rows(rawForm8949Rows)
+    )
 
     res.json(response)
   } catch (err) {
@@ -193,14 +206,15 @@ export default router
 export function buildYearForm(
   taxYear: TaxYear,
   rawInfo: Information<string>,
-  rawAssets: Asset<string>[]
+  rawAssets: Asset<string>[],
+  rawForm8949Rows: Form8949Row<string>[] = []
 ) {
   const information = deserializeInformation(rawInfo)
   const assets = deserializeAssets(rawAssets)
 
   const builder = yearFormBuilder(taxYear)
     .setDownloader(createPdfDownloader(taxYear))
-    .build(information, assets)
+    .build(information, assets, deserializeForm8949Rows(rawForm8949Rows))
 
   return builder
 }

@@ -1798,6 +1798,73 @@ export const isSold = <D>(p: Asset<D>): p is SoldAsset<D> => {
 
 export type AssetString = Asset<string>
 
+/**
+ * Form 8949 category boxes (2025 Instructions for Form 8949). A–F report
+ * securities on Form 1099-B; G–L report digital assets on Form 1099-DA.
+ * Part I takes A, B, C, G, H and I; Part II takes D, E, F, J, K and L.
+ */
+export type Form8949Category =
+  | 'A'
+  | 'B'
+  | 'C'
+  | 'D'
+  | 'E'
+  | 'F'
+  | 'G'
+  | 'H'
+  | 'I'
+  | 'J'
+  | 'K'
+  | 'L'
+
+export const form8949ShortTermCategories: Form8949Category[] = [
+  'A',
+  'B',
+  'C',
+  'G',
+  'H',
+  'I'
+]
+
+export const form8949LongTermCategories: Form8949Category[] = [
+  'D',
+  'E',
+  'F',
+  'J',
+  'K',
+  'L'
+]
+
+/** Column (b) text the form accepts in place of a date (IRS8949 schema). */
+export type Form8949AcquiredCode = 'VARIOUS' | 'INHERITED' | 'INH-2010'
+
+/**
+ * One row of Form 8949, as a broker reported it: column (a) description,
+ * (b) acquired, (c) sold, (d) proceeds and (e) cost or other basis. Columns
+ * (f) and (g) — the adjustment code and amount — are not modelled yet.
+ *
+ * This is not an `Asset`: an asset is a position with a price and a quantity,
+ * while a 1099-B row states proceeds and basis directly.
+ */
+export interface Form8949Row<D = Date> {
+  description: string
+  category: Form8949Category
+  /** Column (b). Exactly one of `acquiredDate` and `acquiredCode`. */
+  acquiredDate?: D
+  acquiredCode?: Form8949AcquiredCode
+  /** Column (c). */
+  soldDate: D
+  /** Column (d). */
+  proceeds: number
+  /** Column (e). */
+  costBasis: number
+}
+
+export type Form8949RowString = Form8949Row<string>
+
+export const isShortTermForm8949Row = <D>(row: Form8949Row<D>): boolean =>
+  form8949ShortTermCategories.includes(row.category)
+
 // Validated action types:
 
 export interface ArrayItemEditAction<A> {

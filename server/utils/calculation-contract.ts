@@ -1,4 +1,11 @@
-import { Information, Asset, TaxYear } from 'ustaxes/core/data'
+import {
+  Information,
+  Asset,
+  TaxYear,
+  Form8949Row,
+  form8949LongTermCategories,
+  form8949ShortTermCategories
+} from 'ustaxes/core/data'
 import {
   information as validateInformation,
   assetString as validateAsset,
@@ -93,6 +100,7 @@ export function validateCalculationRequest(raw: unknown): ContractIssue[] {
     for (const [i, asset] of assets.entries())
       if (!validateAsset(asset))
         issue(`/assets/${i}`, 'invalid_input', 'Invalid asset')
+  validateForm8949Rows(raw.form8949Rows, raw.taxYear, issue)
   if (issues.length) return issues
   if (raw.taxYear === 'Y2025') {
     for (const key of ['rrtaCompensation', 'rrtaTax']) {
@@ -265,6 +273,78 @@ export interface CalculationRequest {
   taxYear: TaxYear
   information: Information<string>
   assets: Asset<string>[]
+  /** Form 8949 rows as a broker reported them (TY2025 only). */
+  form8949Rows: Form8949Row<string>[]
+}
+
+const form8949Categories = [
+  ...form8949ShortTermCategories,
+  ...form8949LongTermCategories
+] as string[]
+
+const acquiredCodes = ['VARIOUS', 'INHERITED', 'INH-2010']
+
+/**
+ * Form 8949 rows are validated here rather than by the generated Information
+ * validator: they arrive beside `assets`, not inside `information`. Columns
+ * (f) and (g) are not implemented, so a row carrying an adjustment is refused
+ * by name instead of being silently reported without it.
+ */
+function validateForm8949Rows(
+  raw: unknown,
+  taxYear: unknown,
+  issue: (path: string, code: string, message: string) => void
+): void {
+  if (raw === undefined) return
+  if (!Array.isArray(raw)) {
+    issue('/form8949Rows', 'invalid_input', 'Form 8949 rows must be an array')
+    return
+  }
+  if (raw.length > 0 && taxYear !== 'Y2025') {
+    issue(
+      '/form8949Rows',
+      'unsupported',
+      'Form 8949 rows are implemented for TY2025 only'
+    )
+    return
+  }
+  raw.forEach((row, i) => {
+    const at = `/form8949Rows/${i}`
+    if (!object(row)) {
+      issue(at, 'invalid_input', 'Form 8949 row must be an object')
+      return
+    }
+    if (typeof row.description !== 'string' || row.description.trim() === '')
+      issue(`${at}/description`, 'invalid_input', 'Column (a) is required')
+    if (!form8949Categories.includes(row.category as string))
+      issue(`${at}/category`, 'invalid_input', 'Unrecognized Form 8949 box')
+    const hasDate = typeof row.acquiredDate === 'string'
+    const hasCode = row.acquiredCode !== undefined
+    if (hasDate === hasCode)
+      issue(
+        `${at}/acquiredDate`,
+        'invalid_input',
+        'Column (b) takes exactly one of a date and a code'
+      )
+    if (hasCode && !acquiredCodes.includes(row.acquiredCode as string))
+      issue(
+        `${at}/acquiredCode`,
+        'invalid_input',
+        'Column (b) code must be VARIOUS, INHERITED or INH-2010'
+      )
+    if (typeof row.soldDate !== 'string')
+      issue(`${at}/soldDate`, 'invalid_input', 'Column (c) is required')
+    for (const key of ['proceeds', 'costBasis'])
+      if (typeof row[key] !== 'number' || !Number.isFinite(row[key]))
+        issue(`${at}/${key}`, 'invalid_input', `${key} must be a number`)
+    for (const key of ['adjustmentCode', 'adjustmentAmount'])
+      if (row[key] !== undefined)
+        issue(
+          `${at}/${key}`,
+          'unsupported',
+          'Form 8949 columns (f) and (g) adjustments are not implemented'
+        )
+  })
 }
 
 /** The assertion is confined to this AJV-validated boundary. */
@@ -284,7 +364,10 @@ export function parseCalculationRequest(
       information: normalizeInformation(
         raw.information
       ) as unknown as Information<string>,
-      assets: (raw.assets === undefined ? [] : raw.assets) as Asset<string>[]
+      assets: (raw.assets === undefined ? [] : raw.assets) as Asset<string>[],
+      form8949Rows: (raw.form8949Rows === undefined
+        ? []
+        : raw.form8949Rows) as Form8949Row<string>[]
     }
   }
 }
