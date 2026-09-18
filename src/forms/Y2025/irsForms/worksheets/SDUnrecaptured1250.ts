@@ -1,15 +1,14 @@
 import F1040 from '../F1040'
+import { roundLine } from '../rounding'
 
 /**
- * Unrecaptured Section 1250 Gain Worksheet — Schedule D, Line 19
+ * Unrecaptured Section 1250 Gain Worksheet — Line 19 (2025 Instructions for
+ * Schedule D).
  *
- * Computes unrecaptured section 1250 gain (taxed at max 25%).
- * Sources: Form 4797 (section 1250 property sales), 1099-DIV box 2d,
- * K-1 box 9c, installment sales of section 1250 property.
- *
- * This gain represents the portion of gain on section 1250 property
- * (real property) attributable to depreciation that is not excess
- * depreciation (which would be ordinary income under section 1250).
+ * Line for line as printed. Lines 1 through 9 are the Form 4797 chain, which
+ * this engine carries only as the form's own unrecaptured amount; the
+ * partnership-interest gain (line 10) and the sales outside Form 4797 Part I
+ * (line 12) are not modeled and say so.
  */
 export default class SDUnrecaptured1250 {
   f1040: F1040
@@ -18,15 +17,8 @@ export default class SDUnrecaptured1250 {
     this.f1040 = f1040
   }
 
-  // Line 1: Gain from Form 4797, section 1250 property
-  // This is the unrecaptured portion (depreciation allowed minus excess depreciation)
-  l1 = (): number => {
-    if (this.f1040.f4797 === undefined) return 0
-    return this.f1040.f4797.unrecapturedSection1250Gain()
-  }
-
-  // Lines 2-8: Various adjustments (installment sales, like-kind exchanges, etc.)
-  // These are specialist items that require additional data models
+  /** 1–8. The Form 4797 chain; this engine takes its unrecaptured amount whole. */
+  l1 = (): number => 0
   l2 = (): number => 0
   l3 = (): number => 0
   l4 = (): number => 0
@@ -35,48 +27,62 @@ export default class SDUnrecaptured1250 {
   l7 = (): number => 0
   l8 = (): number => 0
 
-  // Line 9: Add lines 1-8
+  /** 9. Subtract line 8 from line 7. If zero or less, -0-. */
   l9 = (): number =>
-    this.l1() + this.l2() + this.l3() + this.l4() +
-    this.l5() + this.l6() + this.l7() + this.l8()
+    roundLine(Math.max(0, this.f1040.f4797?.unrecapturedSection1250Gain() ?? 0))
 
-  // Line 10: Unrecaptured section 1250 gain from 1099-DIV (box 2d)
-  l10 = (): number =>
-    this.f1040
-      .f1099Divs()
-      .reduce((sum, f) => sum + (f.form.unrecapturedSection1250Gain ?? 0), 0)
+  /** 10. Gain on an interest in a partnership attributable to unrecaptured section 1250 gain. */
+  l10 = (): number => 0
 
-  // Line 11: Unrecaptured section 1250 gain from K-1 (box 9c)
+  /**
+   * 11. Amounts reported as "unrecaptured section 1250 gain" on a Schedule
+   * K-1, Form 1099-DIV box 2b, Form 2439 or with a Form 1099-R.
+   */
   l11 = (): number =>
-    this.f1040.info.scheduleK1Form1065s.reduce(
-      (sum, k1) => sum + (k1.unrecapturedSection1250Gain ?? 0),
-      0
+    roundLine(
+      this.f1040
+        .f1099Divs()
+        .reduce(
+          (sum, f) => sum + (f.form.unrecapturedSection1250Gain ?? 0),
+          0
+        ) +
+        this.f1040.info.scheduleK1Form1065s.reduce(
+          (sum, k1) => sum + (k1.unrecapturedSection1250Gain ?? 0),
+          0
+        )
     )
 
-  // Line 12: Add lines 9, 10, and 11
-  l12 = (): number => this.l9() + this.l10() + this.l11()
+  /** 12. Sales of section 1250 property outside Form 4797 Part I. */
+  l12 = (): number => 0
 
-  // Line 13: Long-term capital loss carryover (positive amount)
-  l13 = (): number => {
-    const carryover = this.f1040.info.longTermCapitalLossCarryover
-    return carryover !== undefined && carryover > 0 ? carryover : 0
+  /** 13. Add lines 9 through 12. */
+  l13 = (): number => this.l9() + this.l10() + this.l11() + this.l12()
+
+  /**
+   * 14. With any section 1202 gain or collectibles gain or (loss), the total
+   * of lines 1 through 4 of the 28% Rate Gain Worksheet; otherwise -0-.
+   */
+  l14 = (): number =>
+    this.f1040.scheduleD.rateGainWorksheet.linesOneThroughFour()
+
+  /** 15. Schedule D line 7 when it is a (loss); zero or a gain, -0-. */
+  l15 = (): number => Math.min(0, this.f1040.scheduleD.l7())
+
+  /** 16. Long-term capital loss carryovers from Schedule D line 14, as a (loss). */
+  l16 = (): number => {
+    const carryover = this.f1040.info.longTermCapitalLossCarryover ?? 0
+    return carryover > 0 ? -carryover : 0
   }
 
-  // Line 14: Net short-term capital loss (if Schedule D line 7 is a loss, absolute value)
-  l14 = (): number => {
-    const sdL7 = this.f1040.scheduleD.l7()
-    return sdL7 < 0 ? -sdL7 : 0
-  }
+  /**
+   * 17. Combine lines 14 through 16. A (loss) is entered as a positive
+   * amount; zero or a gain is -0-.
+   */
+  l17 = (): number => Math.max(0, -(this.l14() + this.l15() + this.l16()))
 
-  // Line 15: Add lines 13 and 14
-  l15 = (): number => this.l13() + this.l14()
-
-  // Line 16: Subtract line 15 from line 12. If zero or less, enter 0.
-  l16 = (): number => Math.max(0, this.l12() - this.l15())
-
-  // Line 17: Net long-term capital gain from Schedule D line 15
-  l17 = (): number => Math.max(0, this.f1040.scheduleD.l15())
-
-  // Line 18: Smaller of line 16 or line 17 → Schedule D line 19
-  l18 = (): number => Math.min(this.l16(), this.l17())
+  /**
+   * 18. Subtract line 17 from line 13. If zero or less, -0-; if more than
+   * zero, also Schedule D line 19.
+   */
+  l18 = (): number => Math.max(0, this.l13() - this.l17())
 }
