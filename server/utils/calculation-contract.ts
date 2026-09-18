@@ -101,6 +101,24 @@ export function validateCalculationRequest(raw: unknown): ContractIssue[] {
       if (!validateAsset(asset))
         issue(`/assets/${i}`, 'invalid_input', 'Invalid asset')
   validateForm8949Rows(raw.form8949Rows, raw.taxYear, issue)
+  // Schedule D lines 6 and 14 take the carryovers as the Capital Loss
+  // Carryover Worksheet gives them (lines 8 and 13): whole dollars, never
+  // negative. A negative one would otherwise be dropped without a word.
+  for (const key of [
+    'shortTermCapitalLossCarryover',
+    'longTermCapitalLossCarryover'
+  ]) {
+    const value = normalized[key]
+    if (
+      value !== undefined &&
+      (typeof value !== 'number' || !Number.isInteger(value) || value < 0)
+    )
+      issue(
+        `/information/${key}`,
+        'invalid_input',
+        'A capital loss carryover is a whole-dollar amount of zero or more'
+      )
+  }
   if (issues.length) return issues
   if (raw.taxYear === 'Y2025') {
     for (const key of ['rrtaCompensation', 'rrtaTax']) {

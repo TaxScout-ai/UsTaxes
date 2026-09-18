@@ -1,6 +1,7 @@
 import { F1099BData, FilingStatus } from 'ustaxes/core/data'
 import { FormTag } from 'ustaxes/core/irsForms/Form'
 import { sumFields } from 'ustaxes/core/irsForms/util'
+import { sumToWholeDollars } from './rounding'
 import SDRateGainWorksheet from './worksheets/SDRateGainWorksheet'
 import SDUnrecaptured1250 from './worksheets/SDUnrecaptured1250'
 import F8949 from './F8949'
@@ -9,6 +10,10 @@ import F1040 from './F1040'
 import { Field } from 'ustaxes/core/pdfFiller'
 import SDTaxWorksheet from './worksheets/SDTaxWorksheet'
 import QualDivAndCGWorksheet from './worksheets/SDQualifiedAndCapGains'
+import {
+  CapitalLossCarryover,
+  capitalLossCarryover
+} from './worksheets/CapitalLossCarryoverWorksheet'
 export default class ScheduleD extends F1040Attachment {
   tag: FormTag = 'f1040sd'
   sequenceIndex = 12
@@ -35,19 +40,43 @@ export default class ScheduleD extends F1040Attachment {
     if (this._aggregated === undefined) {
       const bs: F1099BData[] = this.f1040.f1099Bs().map((f) => f.form)
 
+      // Lines 1a and 8a print whole dollars: each column adds the
+      // statements' exact cents and rounds once. Summing floats left the
+      // cents on the line, and on every line netted from it.
+      const column = (pick: (b: F1099BData) => number, label: string) =>
+        sumToWholeDollars(bs.map(pick), label)
       this._aggregated = {
-        shortTermProceeds: bs.reduce((l, r) => l + r.shortTermProceeds, 0),
-        shortTermCostBasis: bs.reduce((l, r) => l + r.shortTermCostBasis, 0),
-        longTermProceeds: bs.reduce((l, r) => l + r.longTermProceeds, 0),
-        longTermCostBasis: bs.reduce((l, r) => l + r.longTermCostBasis, 0)
+        shortTermProceeds: column(
+          (b) => b.shortTermProceeds,
+          'Schedule D line 1a(d)'
+        ),
+        shortTermCostBasis: column(
+          (b) => b.shortTermCostBasis,
+          'Schedule D line 1a(e)'
+        ),
+        longTermProceeds: column(
+          (b) => b.longTermProceeds,
+          'Schedule D line 8a(d)'
+        ),
+        longTermCostBasis: column(
+          (b) => b.longTermCostBasis,
+          'Schedule D line 8a(e)'
+        )
       }
     }
 
     return this._aggregated
   }
 
+  /**
+   * A carryover alone is reason to file: lines 6 and 14 take it and line 21
+   * allows up to $3,000 of it even in a year with no sale.
+   */
   isNeeded = (): boolean =>
-    this.f1040.f1099Bs().length > 0 || this.f1040.f8949.isNeeded()
+    this.f1040.f1099Bs().length > 0 ||
+    this.f1040.f8949.isNeeded() ||
+    (this.f1040.info.shortTermCapitalLossCarryover ?? 0) > 0 ||
+    (this.f1040.info.longTermCapitalLossCarryover ?? 0) > 0
 
   l21Min = (): number => {
     if (this.f1040.info.taxPayer.filingStatus === FilingStatus.MFS) {
@@ -243,8 +272,11 @@ export default class ScheduleD extends F1040Attachment {
   // If 0, go to L22
   l16 = (): number => sumFields([this.l7(), this.l15()])
 
-  // Are L15 and L16 both gains?
-  l17 = (): boolean => this.l15() > 0 && this.l16() > 0
+  /**
+   * Are lines 15 and 16 both gains? Asked only when line 16 is a gain: a
+   * loss skips lines 17 through 20, and zero skips 17 through 21.
+   */
+  l17 = (): boolean | undefined => (this.l16() > 0 ? this.l15() > 0 : undefined)
 
   l18 = (): number | undefined => {
     if (!this.l17()) {
@@ -267,8 +299,9 @@ export default class ScheduleD extends F1040Attachment {
     return (this.l18() ?? 0) === 0 && (this.l19() ?? 0) === 0
   }
 
-  fillL21 = (): boolean =>
-    !this.l20() && ((this.l16() > 0 && this.l17()) || this.l16() < 0)
+  // Line 21 is reached only from a loss on line 16; a gain answers line 20,
+  // whose "Yes" and "No" both say not to complete lines 21 and 22.
+  fillL21 = (): boolean => this.l16() < 0
 
   l21 = (): number | undefined => {
     if (this.fillL21()) {
@@ -287,13 +320,19 @@ export default class ScheduleD extends F1040Attachment {
   l22 = (): boolean | undefined =>
     this.l20() === undefined ? this.haveQualifiedDividends() : undefined
 
-  lossCarryForward = (): number => {
-    const amount = this.l16() + this.l21Min()
-    if (amount < 0) {
-      return -amount
-    }
-    return 0
-  }
+  /**
+   * The carryover into 2026 by the Capital Loss Carryover Worksheet, run on
+   * this return as the line 21 instructions direct (Pub. 550). Worksheet
+   * line 1 is line 15 before its floor: line 11a less line 14.
+   */
+  carryoverToNextYear = (): CapitalLossCarryover =>
+    capitalLossCarryover({
+      taxableIncomeBeforeFloor:
+        this.f1040.l9() - (this.f1040.l10() ?? 0) - this.f1040.l14(),
+      scheduleDLine21: this.l21(),
+      scheduleDLine7: this.l7(),
+      scheduleDLine15: this.l15()
+    })
 
   to1040 = (): number => this.l21() ?? this.l16()
 
@@ -347,8 +386,8 @@ export default class ScheduleD extends F1040Attachment {
     this.l14(),
     this.l15(),
     this.l16(),
-    this.l17(),
-    !this.l17(),
+    this.l17() === true,
+    this.l17() === false,
     this.l18(),
     this.l19(),
     this.l20() === true,
