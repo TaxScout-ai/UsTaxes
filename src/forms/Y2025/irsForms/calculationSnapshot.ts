@@ -72,6 +72,11 @@ type Lines = Record<string, number | null>
  * v15 is v14 plus Form 8949 (TAX-4953): `form8949`, one entry per printed
  * part in copy order with its box, rows and line 2 totals, and Schedule D
  * lines 1b, 2, 3, 8b, 9 and 10 by the box checked at the top of each part.
+ *
+ * v16 adds Form 8949 columns (f) and (g) (TAX-4954): each row's
+ * `adjustmentCode` and `adjustment`, each part's `totals.adjustments`, and
+ * column (g) of Schedule D lines 1b, 2, 3, 8b, 9 and 10. Column (h) now takes
+ * the adjustment into account.
  */
 const yesNo = (v: boolean | undefined): number | null =>
   v === undefined ? null : v ? 1 : 0
@@ -418,12 +423,15 @@ export function calculationSnapshot(f: F1040) {
             // the top of each Part I — v15.
             '1bd': f.scheduleD.l1bd(),
             '1be': f.scheduleD.l1be(),
+            '1bg': f.scheduleD.l1bg(),
             '1bh': f.scheduleD.l1bh(),
             '2d': f.scheduleD.l2d(),
             '2e': f.scheduleD.l2e(),
+            '2g': f.scheduleD.l2g(),
             '2h': f.scheduleD.l2h(),
             '3d': f.scheduleD.l3d(),
             '3e': f.scheduleD.l3e(),
+            '3g': f.scheduleD.l3g(),
             '3h': f.scheduleD.l3h(),
             '7': f.scheduleD.l7(),
             '8ad': f.scheduleD.l8ad() ?? null,
@@ -432,12 +440,15 @@ export function calculationSnapshot(f: F1040) {
             // Lines 8b, 9 and 10: the same three boxes of Part II — v15.
             '8bd': f.scheduleD.l8bd(),
             '8be': f.scheduleD.l8be(),
+            '8bg': f.scheduleD.l8bg(),
             '8bh': f.scheduleD.l8bh(),
             '9d': f.scheduleD.l9d(),
             '9e': f.scheduleD.l9e(),
+            '9g': f.scheduleD.l9g(),
             '9h': f.scheduleD.l9h(),
             '10d': f.scheduleD.l10d(),
             '10e': f.scheduleD.l10e(),
+            '10g': f.scheduleD.l10g(),
             '10h': f.scheduleD.l10h(),
             '13': f.scheduleD.l13() ?? null,
             '15': f.scheduleD.l15(),
@@ -1025,6 +1036,9 @@ export function calculationSnapshot(f: F1040) {
                     sold: r.sold,
                     proceeds: r.proceeds,
                     costBasis: r.costBasis,
+                    // v16: columns (f) and (g); null when the row has none.
+                    adjustmentCode: r.adjustmentCode ?? null,
+                    adjustment: r.adjustment ?? null,
                     gain: r.gain
                   })),
                   totals: {
@@ -1036,6 +1050,15 @@ export function calculationSnapshot(f: F1040) {
                       (acc, r) => acc + r.costBasis,
                       0
                     ),
+                    // v16: line 2 column (g); null when no row has one.
+                    adjustments: printed.rows.some(
+                      (r) => r.adjustment !== undefined
+                    )
+                      ? printed.rows.reduce(
+                          (acc, r) => acc + (r.adjustment ?? 0),
+                          0
+                        )
+                      : null,
                     gain: printed.rows.reduce((acc, r) => acc + r.gain, 0)
                   }
                 }
@@ -1043,7 +1066,7 @@ export function calculationSnapshot(f: F1040) {
         )
       )
   return {
-    schemaVersion: 'ustaxes-1040-line-snapshot-v15',
+    schemaVersion: 'ustaxes-1040-line-snapshot-v16',
     taxYear: 2025,
     form: '1040',
     lines,

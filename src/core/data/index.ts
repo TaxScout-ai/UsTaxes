@@ -1840,8 +1840,8 @@ export type Form8949AcquiredCode = 'VARIOUS' | 'INHERITED' | 'INH-2010'
 
 /**
  * One row of Form 8949, as a broker reported it: column (a) description,
- * (b) acquired, (c) sold, (d) proceeds and (e) cost or other basis. Columns
- * (f) and (g) — the adjustment code and amount — are not modelled yet.
+ * (b) acquired, (c) sold, (d) proceeds, (e) cost or other basis, and the
+ * adjustment in columns (f) and (g).
  *
  * This is not an `Asset`: an asset is a position with a price and a quantity,
  * while a 1099-B row states proceeds and basis directly.
@@ -1858,6 +1858,16 @@ export interface Form8949Row<D = Date> {
   proceeds: number
   /** Column (e). */
   costBasis: number
+  /**
+   * Column (f): the adjustment code(s) from the instructions, in alphabetical
+   * order with no repeat (for example "BW"). Absent when the row has none.
+   */
+  adjustmentCode?: string
+  /**
+   * Column (g): the net adjustment, positive or negative. A code may carry
+   * zero, as code B does when the correct basis is already in column (e).
+   */
+  adjustmentAmount?: number
 }
 
 export type Form8949RowString = Form8949Row<string>
