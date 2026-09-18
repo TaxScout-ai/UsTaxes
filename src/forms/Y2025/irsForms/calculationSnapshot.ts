@@ -63,6 +63,15 @@ type Lines = Record<string, number | null>
  * - Form 8606 (the first copy): Part I lines 1–15c with line 10 in
  *   thousandths, the question between lines 3 and 4 as 1/0 (`3q`), Part II
  *   lines 16–18 and Part III lines 19–25c, a blank line as `null`.
+ *
+ * v14 was then published twice as well: TAX-4953 (Form 8949 rows) raised
+ * v13 to v14 on its own branch at the same time, and the one-line change
+ * merged without a conflict. A v14 snapshot from between the two merges has
+ * no Form 8949 section.
+ *
+ * v15 is v14 plus Form 8949 (TAX-4953): `form8949`, one entry per printed
+ * part in copy order with its box, rows and line 2 totals, and Schedule D
+ * lines 1b, 2, 3, 8b, 9 and 10 by the box checked at the top of each part.
  */
 const yesNo = (v: boolean | undefined): number | null =>
   v === undefined ? null : v ? 1 : 0
@@ -406,7 +415,7 @@ export function calculationSnapshot(f: F1040) {
             '1ae': f.scheduleD.l1ae() ?? null,
             '1ah': f.scheduleD.l1ah(),
             // Lines 1b, 2 and 3: the Form 8949 totals by the box checked at
-            // the top of each Part I — v14.
+            // the top of each Part I — v15.
             '1bd': f.scheduleD.l1bd(),
             '1be': f.scheduleD.l1be(),
             '1bh': f.scheduleD.l1bh(),
@@ -420,7 +429,7 @@ export function calculationSnapshot(f: F1040) {
             '8ad': f.scheduleD.l8ad() ?? null,
             '8ae': f.scheduleD.l8ae() ?? null,
             '8ah': f.scheduleD.l8ah() ?? null,
-            // Lines 8b, 9 and 10: the same three boxes of Part II — v14.
+            // Lines 8b, 9 and 10: the same three boxes of Part II — v15.
             '8bd': f.scheduleD.l8bd(),
             '8be': f.scheduleD.l8be(),
             '8bh': f.scheduleD.l8bh(),
@@ -990,7 +999,7 @@ export function calculationSnapshot(f: F1040) {
   }
   /**
    * Form 8949 as printed: one entry per part, in copy order, with the box
-   * checked at its top, its rows and its line 2 totals (v14). Rows are the
+   * checked at its top, its rows and its line 2 totals (v15). Rows are the
    * printed whole-dollar entries, so a reader can add them up and get the
    * totals, as the form's own arithmetic does.
    */
@@ -1034,7 +1043,7 @@ export function calculationSnapshot(f: F1040) {
         )
       )
   return {
-    schemaVersion: 'ustaxes-1040-line-snapshot-v14',
+    schemaVersion: 'ustaxes-1040-line-snapshot-v15',
     taxYear: 2025,
     form: '1040',
     lines,

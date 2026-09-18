@@ -271,7 +271,7 @@ describe('Form 8606 Part I (TAX-4862)', () => {
         ]
       )
     )
-    expect(snap.schemaVersion).toBe('ustaxes-1040-line-snapshot-v14')
+    expect(snap.schemaVersion).toBe('ustaxes-1040-line-snapshot-v15')
     const form = snap.attachments.form8606
     expect(form?.copies).toBe(1)
     expect(form?.lines).toMatchObject({

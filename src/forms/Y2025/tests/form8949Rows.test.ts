@@ -187,9 +187,9 @@ describe('Form 8949 rows (TY2025)', () => {
     expect(calculationSnapshot(f).form8949).toBeNull()
   })
 
-  it('is v14', () => {
+  it('is v15', () => {
     expect(calculationSnapshot(returnWith([])).schemaVersion).toBe(
-      'ustaxes-1040-line-snapshot-v14'
+      'ustaxes-1040-line-snapshot-v15'
     )
   })
 

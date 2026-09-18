@@ -33,7 +33,7 @@ const withInvestmentIncome = (
 describe('calculation snapshot v10: interest, dividends and Schedule B', () => {
   it('exposes lines 2a–3b and Schedule B when a total is over $1,500', () => {
     const s = withInvestmentIncome([1200, 700], 2000, 1600)
-    expect(s.schemaVersion).toBe('ustaxes-1040-line-snapshot-v14')
+    expect(s.schemaVersion).toBe('ustaxes-1040-line-snapshot-v15')
     expect(s.lines).toMatchObject({
       '2a': null,
       '2b': 1900,
