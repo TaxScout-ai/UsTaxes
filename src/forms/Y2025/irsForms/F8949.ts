@@ -27,7 +27,16 @@ type EmptyLine = [
 ]
 
 type Line =
-  | [string, string, string, number, number, undefined, undefined, number]
+  | [
+      string,
+      string,
+      string,
+      number,
+      number,
+      string | undefined,
+      number | undefined,
+      number
+    ]
   | EmptyLine
 const emptyLine: EmptyLine = [
   undefined,
@@ -63,6 +72,10 @@ export interface PrintedRow {
   sold: string
   proceeds: number
   costBasis: number
+  /** Column (f), when the row has an adjustment. */
+  adjustmentCode?: string
+  /** Column (g), when the row has an adjustment; zero is printed as zero. */
+  adjustment?: number
   gain: number
   category: Form8949Category
 }
@@ -73,6 +86,13 @@ const printedRow = (
 ): PrintedRow => {
   const proceeds = roundLine(row.proceeds)
   const costBasis = roundLine(row.costBasis)
+  // Column (h): "subtract the cost or other basis in column (e) from the
+  // proceeds in column (d). Then take into account any adjustments in
+  // column (g)" — each entry already a whole dollar.
+  const adjustment =
+    row.adjustmentCode === undefined
+      ? undefined
+      : roundLine(row.adjustmentAmount ?? 0)
   return {
     description: row.description,
     acquired:
@@ -82,7 +102,9 @@ const printedRow = (
     sold: format(row.soldDate),
     proceeds,
     costBasis,
-    gain: proceeds - costBasis,
+    adjustmentCode: row.adjustmentCode,
+    adjustment,
+    gain: proceeds - costBasis + (adjustment ?? 0),
     category: row.category
   }
 }
@@ -93,8 +115,8 @@ const toLine = (row: PrintedRow): Line => [
   row.sold,
   row.proceeds,
   row.costBasis,
-  undefined,
-  undefined,
+  row.adjustmentCode,
+  row.adjustment,
   row.gain
 ]
 
@@ -266,8 +288,9 @@ export default class F8949 extends F1040Attachment {
   shortTermTotalGain = (): number =>
     this.shortTermSales().reduce((acc, p) => acc + p.gain, 0)
 
-  // TODO: handle adjustments column.
-  shortTermTotalAdjustments = (): number | undefined => undefined
+  /** Line 2 column (g): blank when no row of the part has an adjustment. */
+  shortTermTotalAdjustments = (): number | undefined =>
+    this.totalAdjustments(this.shortTermSales())
 
   longTermTotalProceeds = (): number =>
     this.longTermSales().reduce((acc, p) => acc + p.proceeds, 0)
@@ -278,8 +301,13 @@ export default class F8949 extends F1040Attachment {
   longTermTotalGain = (): number =>
     this.longTermSales().reduce((acc, p) => acc + p.gain, 0)
 
-  // TODO: handle adjustments column.
-  longTermTotalAdjustments = (): number | undefined => undefined
+  longTermTotalAdjustments = (): number | undefined =>
+    this.totalAdjustments(this.longTermSales())
+
+  private totalAdjustments = (rows: PrintedRow[]): number | undefined =>
+    rows.some((r) => r.adjustment !== undefined)
+      ? rows.reduce((acc, r) => acc + (r.adjustment ?? 0), 0)
+      : undefined
 
   fields = (): Field[] => [
     this.f1040.namesString(),

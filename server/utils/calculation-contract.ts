@@ -284,11 +284,12 @@ const form8949Categories = [
 
 const acquiredCodes = ['VARIOUS', 'INHERITED', 'INH-2010']
 
+/** Column (f) codes, 2025 Instructions for Form 8949 (F8949-003-04). */
+const adjustmentCodes = 'BCDEHLMNOPQRSTWXYZ'.split('')
+
 /**
  * Form 8949 rows are validated here rather than by the generated Information
- * validator: they arrive beside `assets`, not inside `information`. Columns
- * (f) and (g) are not implemented, so a row carrying an adjustment is refused
- * by name instead of being silently reported without it.
+ * validator: they arrive beside `assets`, not inside `information`.
  */
 function validateForm8949Rows(
   raw: unknown,
@@ -337,13 +338,38 @@ function validateForm8949Rows(
     for (const key of ['proceeds', 'costBasis'])
       if (typeof row[key] !== 'number' || !Number.isFinite(row[key]))
         issue(`${at}/${key}`, 'invalid_input', `${key} must be a number`)
-    for (const key of ['adjustmentCode', 'adjustmentAmount'])
-      if (row[key] !== undefined)
+    // Column (f): the codes the 2025 instructions define (F8949-003-04), in
+    // alphabetical order with no repeat (F8949-002). Column (g) needs one.
+    const code = row.adjustmentCode
+    const amount = row.adjustmentAmount
+    if (code !== undefined) {
+      const letters = typeof code === 'string' ? code.split('') : []
+      if (
+        typeof code !== 'string' ||
+        !/^[A-Z]{1,7}$/.test(code) ||
+        letters.some((l) => !adjustmentCodes.includes(l)) ||
+        letters.some((l, i) => i > 0 && l <= letters[i - 1])
+      )
         issue(
-          `${at}/${key}`,
-          'unsupported',
-          'Form 8949 columns (f) and (g) adjustments are not implemented'
+          `${at}/adjustmentCode`,
+          'invalid_input',
+          'Column (f) takes codes from the instructions, in alphabetical order, each once'
         )
+    }
+    if (amount !== undefined) {
+      if (typeof amount !== 'number' || !Number.isFinite(amount))
+        issue(
+          `${at}/adjustmentAmount`,
+          'invalid_input',
+          'Column (g) must be a number'
+        )
+      if (code === undefined)
+        issue(
+          `${at}/adjustmentAmount`,
+          'invalid_input',
+          'Column (g) needs a code in column (f) to explain it'
+        )
+    }
   })
 }
 

@@ -18,7 +18,7 @@ describe('calculation snapshot v11: estimated and extension payments', () => {
     // 1,000.30 + 1,000.30 = 2,000.60 → 2,001; rounding each first gives 2,000.
     const f = withPayments([1000.3, 1000.3])
     const s = calculationSnapshot(f)
-    expect(s.schemaVersion).toBe('ustaxes-1040-line-snapshot-v15')
+    expect(s.schemaVersion).toBe('ustaxes-1040-line-snapshot-v16')
     expect(s.lines['26']).toBe(2001)
     expect(s.lines['33']).toBe((s.lines['25d'] ?? 0) + 2001)
     expect(s.lines['31']).toBeNull()
