@@ -77,6 +77,13 @@ type Lines = Record<string, number | null>
  * `adjustmentCode` and `adjustment`, each part's `totals.adjustments`, and
  * column (g) of Schedule D lines 1b, 2, 3, 8b, 9 and 10. Column (h) now takes
  * the adjustment into account.
+ *
+ * v17 adds capital losses (TAX-4955): Schedule D lines 6 and 14 (the
+ * carryovers from 2024, negative as printed), line 21 only for a loss on
+ * line 16, line 17 `null` when line 16 is zero or a loss (the form skips
+ * it), and `worksheets.capitalLossCarryover` — the Capital Loss Carryover
+ * Worksheet on this return, lines 1–13, whose lines 8 and 13 carry into
+ * 2026. Schedule D is present for a carryover alone.
  */
 const yesNo = (v: boolean | undefined): number | null =>
   v === undefined ? null : v ? 1 : 0
@@ -433,6 +440,9 @@ export function calculationSnapshot(f: F1040) {
             '3e': f.scheduleD.l3e(),
             '3g': f.scheduleD.l3g(),
             '3h': f.scheduleD.l3h(),
+            // Lines 6 and 14, the carryovers from 2024, as the form prints
+            // them: negative, blank when there is none — v17.
+            '6': f.scheduleD.l6() ?? null,
             '7': f.scheduleD.l7(),
             '8ad': f.scheduleD.l8ad() ?? null,
             '8ae': f.scheduleD.l8ae() ?? null,
@@ -451,6 +461,7 @@ export function calculationSnapshot(f: F1040) {
             '10g': f.scheduleD.l10g(),
             '10h': f.scheduleD.l10h(),
             '13': f.scheduleD.l13() ?? null,
+            '14': f.scheduleD.l14() ?? null,
             '15': f.scheduleD.l15(),
             '16': f.scheduleD.l16(),
             '17': yesNo(f.scheduleD.l17()),
@@ -920,6 +931,9 @@ export function calculationSnapshot(f: F1040) {
           })()
   }
   const ss = f.socialSecurityBenefitsWorksheet
+  const carryoverLines = f.scheduleD.isNeeded()
+    ? f.scheduleD.carryoverToNextYear().lines
+    : null
   const usesQdcg =
     !f.scheduleD.taxWorksheet.isNeeded() &&
     (f.scheduleD.computeTaxOnQDWorksheet() || f.totalQualifiedDividends() > 0)
@@ -981,7 +995,12 @@ export function calculationSnapshot(f: F1040) {
             '25': q.l25()
           } as Lines
         }
-      : null
+      : null,
+    // v17: the Capital Loss Carryover Worksheet run on this return, whose
+    // lines 8 and 13 are the carryovers into 2026 (Schedule D line 21
+    // instructions; Pub. 550). Null when line 21 carries no loss.
+    capitalLossCarryover:
+      carryoverLines === null ? null : { lines: carryoverLines as Lines }
   }
   const indicators = {
     /** Line 7 box: capital gain distributions only, Schedule D not required. */
@@ -1066,7 +1085,7 @@ export function calculationSnapshot(f: F1040) {
         )
       )
   return {
-    schemaVersion: 'ustaxes-1040-line-snapshot-v16',
+    schemaVersion: 'ustaxes-1040-line-snapshot-v17',
     taxYear: 2025,
     form: '1040',
     lines,
