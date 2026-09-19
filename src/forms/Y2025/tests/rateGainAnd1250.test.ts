@@ -161,6 +161,51 @@ describe('the Schedule D Tax Worksheet', () => {
     })
   })
 
+  it('taxes the unrecaptured group at 25% on line 40', () => {
+    // Wages 200,000 and a 40,000 distribution of which 30,000 is box 2b:
+    // line 35 30,000 less line 38 12,550 leaves 17,450 at 25% = 4,363.
+    const s = calculationSnapshot(
+      returnWith(200_000, {
+        capitalGain: 40_000,
+        unrecaptured1250: 30_000,
+        collectibles: 0
+      })
+    )
+    expect(s.worksheets.scheduleDTax?.lines).toMatchObject({
+      '19': 197_300,
+      '21': 197_300,
+      '35': 30_000,
+      '38': 12_550,
+      '39': 17_450,
+      '40': 4_363,
+      '41': null,
+      '44': 40_199,
+      '45': 46_287,
+      '46': 49_463,
+      '47': 46_287
+    })
+  })
+
+  it('rounds the distribution on Schedule D line 13 once', () => {
+    // Three statements with cents: 10,000.40 + 0.30 + 0.30 is 10,001.00.
+    const info = rehearsalInformation(120_000)
+    const f = new F1040(
+      {
+        ...info,
+        f1099s: [
+          dividends({ capitalGain: 10_000.4 }),
+          dividends({ capitalGain: 0.3, unrecaptured1250: 0, collectibles: 0 }),
+          dividends({ capitalGain: 0.3, unrecaptured1250: 0, collectibles: 0 })
+        ]
+      },
+      [],
+      []
+    )
+    expect(calculationSnapshot(f).attachments.scheduleD?.lines).toMatchObject({
+      '13': 10_001
+    })
+  })
+
   it('skips lines 23 through 43 when lines 1 and 16 are the same', () => {
     // Taxable income below the 0% ceiling: every gain is taxed at 0% and
     // the form says to go straight to line 44.
