@@ -1,6 +1,7 @@
 import { Worksheet } from '../F1040Attachment'
 import federalBrackets from '../../data/federal'
 import { computeOrdinaryTax } from '../TaxTable'
+import { roundLine } from '../rounding'
 
 /**
  * Schedule D Tax Worksheet — Line 16 (Schedule D instructions)
@@ -66,7 +67,8 @@ export default class SDTaxWorksheet extends Worksheet {
   l10 = (): number => this.l6() + this.l9()
 
   // Line 11: Add Schedule D lines 18 and 19
-  l11 = (): number => (this.f1040.scheduleD.l18() ?? 0) + (this.f1040.scheduleD.l19() ?? 0)
+  l11 = (): number =>
+    (this.f1040.scheduleD.l18() ?? 0) + (this.f1040.scheduleD.l19() ?? 0)
 
   // Line 12: Smaller of line 9 or line 11
   l12 = (): number => Math.min(this.l9(), this.l11())
@@ -77,139 +79,189 @@ export default class SDTaxWorksheet extends Worksheet {
   // Line 14: Subtract line 13 from line 1. If zero or less, enter 0.
   l14 = (): number => Math.max(0, this.l1() - this.l13())
 
-  // Line 15: 0% bracket cutoff by filing status
-  l15 = (): number => {
-    const fs = this.f1040.info.taxPayer.filingStatus
-    return federalBrackets.longTermCapGains.status[fs].brackets[0]
-  }
+  /**
+   * 15. The 0% bracket ceiling: $48,350 single or married filing separately,
+   * $96,700 joint or qualifying surviving spouse, $64,750 head of household.
+   */
+  l15 = (): number =>
+    federalBrackets.longTermCapGains.status[
+      this.f1040.info.taxPayer.filingStatus
+    ].brackets[0]
 
-  // Line 16: Smaller of line 1 or line 15
+  /** 16. The smaller of line 1 or line 15. */
   l16 = (): number => Math.min(this.l1(), this.l15())
 
-  // Line 17: Smaller of line 14 or line 16
+  /** 17. The smaller of line 14 or line 16. */
   l17 = (): number => Math.min(this.l14(), this.l16())
 
-  // Line 18: Subtract line 10 from line 1. If zero or less, enter 0.
+  /** 18. Subtract line 10 from line 1. If zero or less, -0-. */
   l18 = (): number => Math.max(0, this.l1() - this.l10())
 
-  // Line 19: 15% bracket cutoff by filing status
-  l19 = (): number => {
-    const fs = this.f1040.info.taxPayer.filingStatus
-    return federalBrackets.longTermCapGains.status[fs].brackets[1]
-  }
+  /**
+   * 19. The smaller of line 1 or the top of the 24% ordinary bracket:
+   * $197,300 single, separate or head of household, $394,600 joint. This is
+   * not the long-term capital gain bracket, which line 26 takes.
+   */
+  l19 = (): number =>
+    Math.min(
+      this.l1(),
+      federalBrackets.ordinary.status[this.f1040.info.taxPayer.filingStatus]
+        .brackets[3]
+    )
 
-  // Line 20: Smaller of line 14 or line 19
+  /** 20. The smaller of line 14 or line 19. */
   l20 = (): number => Math.min(this.l14(), this.l19())
 
-  // Line 21: Larger of line 18 or line 20
+  /** 21. The larger of line 18 or line 20. */
   l21 = (): number => Math.max(this.l18(), this.l20())
 
-  // Line 22: Subtract line 17 from line 16. Taxed at 0%.
-  l22 = (): number => Math.max(0, this.l16() - this.l17())
+  /** 22. Subtract line 17 from line 16. This amount is taxed at 0%. */
+  l22 = (): number => this.l16() - this.l17()
 
-  // Lines 23-34: Skip if lines 1 and 16 are the same (go to line 44)
-  private skipTo44 = (): boolean => this.l1() === this.l16()
+  /** "If lines 1 and 16 are the same, skip lines 23 through 43." */
+  private skipsTwentyThree = (): boolean => this.l1() === this.l16()
 
-  // Line 23: Smaller of line 1 or line 13
-  l23 = (): number => Math.min(this.l1(), this.l13())
+  /** 23. The smaller of line 1 or line 13. */
+  l23 = (): number | undefined =>
+    this.skipsTwentyThree() ? undefined : Math.min(this.l1(), this.l13())
 
-  // Line 24: Amount from line 22
-  l24 = (): number => this.l22()
+  /** 24. The amount from line 22; blank is -0-. */
+  l24 = (): number | undefined =>
+    this.skipsTwentyThree() ? undefined : this.l22()
 
-  // Line 25: Subtract line 24 from line 23. If zero or less, enter 0.
-  l25 = (): number => Math.max(0, this.l23() - this.l24())
+  /** 25. Subtract line 24 from line 23. If zero or less, -0-. */
+  l25 = (): number | undefined =>
+    this.skipsTwentyThree()
+      ? undefined
+      : Math.max(0, (this.l23() ?? 0) - (this.l24() ?? 0))
 
-  // Line 26: 15%→20% bracket cutoff
-  l26 = (): number => {
-    const fs = this.f1040.info.taxPayer.filingStatus
-    return federalBrackets.longTermCapGains.status[fs].brackets[1]
-  }
+  /**
+   * 26. The 15% bracket ceiling: $533,400 single, $300,000 separate,
+   * $600,050 joint or qualifying surviving spouse, $566,700 head of
+   * household.
+   */
+  l26 = (): number | undefined =>
+    this.skipsTwentyThree()
+      ? undefined
+      : federalBrackets.longTermCapGains.status[
+          this.f1040.info.taxPayer.filingStatus
+        ].brackets[1]
 
-  // Line 27: Smaller of line 1 or line 26
-  l27 = (): number => Math.min(this.l1(), this.l26())
+  /** 27. The smaller of line 1 or line 26. */
+  l27 = (): number | undefined =>
+    this.skipsTwentyThree() ? undefined : Math.min(this.l1(), this.l26() ?? 0)
 
-  // Line 28: Add lines 21 and 22
-  l28 = (): number => this.l21() + this.l22()
+  /** 28. Add lines 21 and 22. */
+  l28 = (): number | undefined =>
+    this.skipsTwentyThree() ? undefined : this.l21() + this.l22()
 
-  // Line 29: Subtract line 28 from line 27. If zero or less, enter 0.
-  l29 = (): number => Math.max(0, this.l27() - this.l28())
+  /** 29. Subtract line 28 from line 27. If zero or less, -0-. */
+  l29 = (): number | undefined =>
+    this.skipsTwentyThree()
+      ? undefined
+      : Math.max(0, (this.l27() ?? 0) - (this.l28() ?? 0))
 
-  // Line 30: Smaller of line 25 or line 29
-  l30 = (): number => Math.min(this.l25(), this.l29())
+  /** 30. The smaller of line 25 or line 29. */
+  l30 = (): number | undefined =>
+    this.skipsTwentyThree()
+      ? undefined
+      : Math.min(this.l25() ?? 0, this.l29() ?? 0)
 
-  // Line 31: Multiply line 30 by 15%
-  l31 = (): number => this.l30() * 0.15
+  /** 31. Multiply line 30 by 15%; a form line, so whole dollars. */
+  l31 = (): number | undefined =>
+    this.skipsTwentyThree() ? undefined : roundLine((this.l30() ?? 0) * 0.15)
 
-  // Line 32: Add lines 24 and 30
-  l32 = (): number => this.l24() + this.l30()
+  /** 32. Add lines 24 and 30. */
+  l32 = (): number | undefined =>
+    this.skipsTwentyThree() ? undefined : (this.l24() ?? 0) + (this.l30() ?? 0)
 
-  // Lines 33-34: Skip if lines 1 and 32 are the same (go to line 44)
-  private skipTo44From33 = (): boolean => this.l1() === this.l32()
+  /** "If lines 1 and 32 are the same, skip lines 33 through 43." */
+  private skipsThirtyThree = (): boolean =>
+    this.skipsTwentyThree() || this.l1() === this.l32()
 
-  // Line 33: Subtract line 32 from line 23
-  l33 = (): number => Math.max(0, this.l23() - this.l32())
+  /** 33. Subtract line 32 from line 23. */
+  l33 = (): number | undefined =>
+    this.skipsThirtyThree() ? undefined : (this.l23() ?? 0) - (this.l32() ?? 0)
 
-  // Line 34: Multiply line 33 by 20%
-  l34 = (): number => this.l33() * 0.20
+  /** 34. Multiply line 33 by 20%; a form line, so whole dollars. */
+  l34 = (): number | undefined =>
+    this.skipsThirtyThree() ? undefined : roundLine((this.l33() ?? 0) * 0.2)
 
-  // Lines 35-40: Skip if Schedule D line 19 is zero or blank (go to line 41)
-  private hasUnrecaptured1250 = (): boolean =>
-    (this.f1040.scheduleD.l19() ?? 0) > 0
+  /** "If Schedule D, line 19, is zero or blank, skip lines 35 through 40." */
+  private skipsThirtyFive = (): boolean =>
+    this.skipsThirtyThree() || (this.f1040.scheduleD.l19() ?? 0) === 0
 
-  // Line 35: Smaller of line 9 or Schedule D line 19
-  l35 = (): number =>
-    this.hasUnrecaptured1250()
-      ? Math.min(this.l9(), this.f1040.scheduleD.l19() ?? 0)
-      : 0
+  /** 35. The smaller of line 9 or Schedule D line 19. */
+  l35 = (): number | undefined =>
+    this.skipsThirtyFive()
+      ? undefined
+      : Math.min(this.l9(), this.f1040.scheduleD.l19() ?? 0)
 
-  // Line 36: Add lines 10 and 21
-  l36 = (): number => this.l10() + this.l21()
+  /** 36. Add lines 10 and 21. */
+  l36 = (): number | undefined =>
+    this.skipsThirtyFive() ? undefined : this.l10() + this.l21()
 
-  // Line 37: Enter the amount from line 1
-  l37 = (): number => this.l1()
+  /** 37. The amount from line 1. */
+  l37 = (): number | undefined =>
+    this.skipsThirtyFive() ? undefined : this.l1()
 
-  // Line 38: Subtract line 37 from line 36. If zero or less, enter 0.
-  l38 = (): number => Math.max(0, this.l36() - this.l37())
+  /** 38. Subtract line 37 from line 36. If zero or less, -0-. */
+  l38 = (): number | undefined =>
+    this.skipsThirtyFive()
+      ? undefined
+      : Math.max(0, (this.l36() ?? 0) - (this.l37() ?? 0))
 
-  // Line 39: Subtract line 38 from line 35. If zero or less, enter 0.
-  l39 = (): number =>
-    this.hasUnrecaptured1250()
-      ? Math.max(0, this.l35() - this.l38())
-      : 0
+  /** 39. Subtract line 38 from line 35. If zero or less, -0-. */
+  l39 = (): number | undefined =>
+    this.skipsThirtyFive()
+      ? undefined
+      : Math.max(0, (this.l35() ?? 0) - (this.l38() ?? 0))
 
-  // Line 40: Multiply line 39 by 25%
-  l40 = (): number => this.l39() * 0.25
+  /** 40. Multiply line 39 by 25%; a form line, so whole dollars. */
+  l40 = (): number | undefined =>
+    this.skipsThirtyFive() ? undefined : roundLine((this.l39() ?? 0) * 0.25)
 
-  // Lines 41-43: Skip if Schedule D line 18 is zero or blank (go to line 44)
-  private has28PctGain = (): boolean =>
-    (this.f1040.scheduleD.l18() ?? 0) > 0
+  /** "If Schedule D, line 18, is zero or blank, skip lines 41 through 43." */
+  private skipsFortyOne = (): boolean =>
+    this.skipsThirtyThree() || (this.f1040.scheduleD.l18() ?? 0) === 0
 
-  // Line 41: Add lines 21, 22, 30, 33, and 39
-  l41 = (): number =>
-    this.l21() + this.l22() + this.l30() + this.l33() + this.l39()
+  /** 41. Add lines 21, 22, 30, 33 and 39. */
+  l41 = (): number | undefined =>
+    this.skipsFortyOne()
+      ? undefined
+      : this.l21() +
+        this.l22() +
+        (this.l30() ?? 0) +
+        (this.l33() ?? 0) +
+        (this.l39() ?? 0)
 
-  // Line 42: Subtract line 41 from line 1
-  l42 = (): number =>
-    this.has28PctGain() ? Math.max(0, this.l1() - this.l41()) : 0
+  /** 42. Subtract line 41 from line 1. */
+  l42 = (): number | undefined =>
+    this.skipsFortyOne() ? undefined : this.l1() - (this.l41() ?? 0)
 
-  // Line 43: Multiply line 42 by 28%
-  l43 = (): number => this.l42() * 0.28
+  /** 43. Multiply line 42 by 28%; a form line, so whole dollars. */
+  l43 = (): number | undefined =>
+    this.skipsFortyOne() ? undefined : roundLine((this.l42() ?? 0) * 0.28)
 
-  // Line 44: Tax on the amount on line 21 (ordinary rates)
+  /** 44. The tax on line 21, from the Tax Table or the Tax Computation Worksheet. */
   l44 = (): number =>
     computeOrdinaryTax(this.f1040.info.taxPayer.filingStatus, this.l21())
 
-  // Line 45: Add lines 31, 34, 40, 43, and 44
+  /** 45. Add lines 31, 34, 40, 43 and 44. */
   l45 = (): number =>
-    this.l31() + this.l34() + this.l40() + this.l43() + this.l44()
+    (this.l31() ?? 0) +
+    (this.l34() ?? 0) +
+    (this.l40() ?? 0) +
+    (this.l43() ?? 0) +
+    this.l44()
 
-  // Line 46: Tax on amount on line 1 (ordinary rates)
+  /** 46. The tax on line 1, from the Tax Table or the Tax Computation Worksheet. */
   l46 = (): number =>
     computeOrdinaryTax(this.f1040.info.taxPayer.filingStatus, this.l1())
 
-  // Line 47: Smaller of line 45 or line 46
-  l47 = (): number => Math.round(Math.min(this.l45(), this.l46()))
+  /** 47. The smaller of line 45 or line 46; also Form 1040 line 16. */
+  l47 = (): number => Math.min(this.l45(), this.l46())
 
-  // Tax result for F1040 line 16
+  /** Tax result for Form 1040 line 16. */
   tax = (): number => this.l47()
 }

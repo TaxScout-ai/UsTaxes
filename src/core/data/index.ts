@@ -147,8 +147,8 @@ export interface F1099DivData {
   qualifiedDividends: number
   totalCapitalGainsDistributions: number
   federalIncomeTaxWithheld?: number
-  unrecapturedSection1250Gain?: number // Box 2d
-  collectibles28PctGain?: number // Box 2e (28% rate gain distributions)
+  unrecapturedSection1250Gain?: number // Box 2b
+  collectibles28PctGain?: number // Box 2d (collectibles (28%) gain)
   section199ADividends?: number // Box 5
 }
 /*

@@ -1,11 +1,13 @@
 import F1040 from '../F1040'
+import { roundLine } from '../rounding'
 
 /**
- * 28% Rate Gain Worksheet — Schedule D, Line 18
+ * 28% Rate Gain Worksheet — Line 18 (2025 Instructions for Schedule D).
  *
- * Computes the net 28% rate gain from collectibles and section 1202 exclusion.
- * Sources: Form 8949 Part II (collectibles), 1099-DIV box 2e, K-1 box 9b,
- * section 1202 exclusion.
+ * Line for line as printed. The sources this engine does not model are zero
+ * and say so: collectibles on Form 8949 Part II (line 1), the section 1202
+ * exclusion (line 2), Forms 4684/6252/6781/8824 (line 3) and Form 2439
+ * (part of line 4).
  */
 export default class SDRateGainWorksheet {
   f1040: F1040
@@ -14,48 +16,47 @@ export default class SDRateGainWorksheet {
     this.f1040 = f1040
   }
 
-  // Line 1: Collectibles gain (or loss)
-  // From Form 8949 Part II (28% rate items), 1099-DIV box 2e, K-1 box 9b
-  l1 = (): number => {
-    // 1099-DIV box 2e collectibles gain distributions
-    const divCollectibles = this.f1040
-      .f1099Divs()
-      .reduce((sum, f) => sum + (f.form.collectibles28PctGain ?? 0), 0)
+  /** 1. Collectibles gain or (loss) reported on Form 8949, Part II. */
+  l1 = (): number => 0
 
-    // K-1 box 9b collectibles gain
-    const k1Collectibles = this.f1040.info.scheduleK1Form1065s.reduce(
-      (sum, k1) => sum + (k1.collectibles28PctGain ?? 0),
-      0
-    )
-
-    return divCollectibles + k1Collectibles
-  }
-
-  // Line 2: Section 1202 exclusion (entered as negative)
+  /** 2. The section 1202 exclusion, as a positive number. */
   l2 = (): number => 0
 
-  // Line 3: Combine lines 1 and 2
-  l3 = (): number => this.l1() + this.l2()
+  /** 3. Collectibles gain or (loss) from Forms 4684, 6252, 6781 and 8824. */
+  l3 = (): number => 0
 
-  // Line 4: Short-term capital loss carryover (from Schedule D line 6, entered as positive)
-  l4 = (): number => {
-    const carryover = this.f1040.info.shortTermCapitalLossCarryover
-    return carryover !== undefined && carryover > 0 ? -carryover : 0
-  }
+  /** 4. Collectibles gain reported on Form 1099-DIV box 2d, Form 2439 box 1d and Schedule K-1. */
+  l4 = (): number =>
+    roundLine(
+      this.f1040
+        .f1099Divs()
+        .reduce((sum, f) => sum + (f.form.collectibles28PctGain ?? 0), 0) +
+        this.f1040.info.scheduleK1Form1065s.reduce(
+          (sum, k1) => sum + (k1.collectibles28PctGain ?? 0),
+          0
+        )
+    )
 
-  // Line 5: Long-term capital loss carryover (from Schedule D line 14, entered as positive)
+  /** 5. Long-term capital loss carryovers from Schedule D line 14, as a (loss). */
   l5 = (): number => {
-    const carryover = this.f1040.info.longTermCapitalLossCarryover
-    return carryover !== undefined && carryover > 0 ? -carryover : 0
+    const carryover = this.f1040.info.longTermCapitalLossCarryover ?? 0
+    return carryover > 0 ? -carryover : 0
   }
 
-  // Line 6: Net short-term capital loss. If Schedule D line 7 is a loss, enter that loss.
-  l6 = (): number => {
-    const sdL7 = this.f1040.scheduleD.l7()
-    return sdL7 < 0 ? sdL7 : 0
-  }
+  /** 6. Schedule D line 7 when it is a (loss); otherwise -0-. */
+  l6 = (): number => Math.min(0, this.f1040.scheduleD.l7())
 
-  // Line 7: Combine lines 3 through 6. If zero or less, enter 0.
-  // This is the net 28% rate gain → Schedule D line 18
-  l7 = (): number => Math.max(0, this.l3() + this.l4() + this.l5() + this.l6())
+  /**
+   * 7. Combine lines 1 through 6. If zero or less, -0-; if more than zero,
+   * also Schedule D line 18.
+   */
+  l7 = (): number =>
+    Math.max(
+      0,
+      this.l1() + this.l2() + this.l3() + this.l4() + this.l5() + this.l6()
+    )
+
+  /** Lines 1 through 4, which the Unrecaptured Section 1250 Gain Worksheet line 14 takes. */
+  linesOneThroughFour = (): number =>
+    this.l1() + this.l2() + this.l3() + this.l4()
 }

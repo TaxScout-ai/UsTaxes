@@ -72,9 +72,24 @@ export default class ScheduleD extends F1040Attachment {
    * A carryover alone is reason to file: lines 6 and 14 take it and line 21
    * allows up to $3,000 of it even in a year with no sale.
    */
+  /**
+   * A capital gain distribution with an amount in box 2b, 2c or 2d needs
+   * Schedule D: the Form 1040 line 7 box may be checked only when the
+   * distributions are box 2a alone (Form 1040 instructions, line 7).
+   */
+  private specialRateDistributions = (): boolean =>
+    this.f1040
+      .f1099Divs()
+      .some(
+        (f) =>
+          (f.form.unrecapturedSection1250Gain ?? 0) > 0 ||
+          (f.form.collectibles28PctGain ?? 0) > 0
+      )
+
   isNeeded = (): boolean =>
     this.f1040.f1099Bs().length > 0 ||
     this.f1040.f8949.isNeeded() ||
+    this.specialRateDistributions() ||
     (this.f1040.info.shortTermCapitalLossCarryover ?? 0) > 0 ||
     (this.f1040.info.longTermCapitalLossCarryover ?? 0) > 0
 
@@ -240,10 +255,12 @@ export default class ScheduleD extends F1040Attachment {
     return total !== 0 ? total : undefined
   }
 
+  // Line 13 prints whole dollars: the statements' exact cents, rounded once.
   l13 = (): number | undefined =>
-    this.f1040
-      .f1099Divs()
-      .reduce((s, f) => s + f.form.totalCapitalGainsDistributions, 0)
+    sumToWholeDollars(
+      this.f1040.f1099Divs().map((f) => f.form.totalCapitalGainsDistributions),
+      'Schedule D line 13'
+    )
 
   // Line 14: Long-term capital loss carryover from prior year
   l14 = (): number | undefined => {

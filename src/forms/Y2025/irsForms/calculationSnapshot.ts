@@ -84,6 +84,13 @@ type Lines = Record<string, number | null>
  * it), and `worksheets.capitalLossCarryover` — the Capital Loss Carryover
  * Worksheet on this return, lines 1–13, whose lines 8 and 13 carry into
  * 2026. Schedule D is present for a carryover alone.
+ *
+ * v18 adds the 28% rate group and unrecaptured section 1250 gain
+ * (TAX-4956): `worksheets.rateGain` (lines 1–7) and
+ * `worksheets.unrecaptured1250` (lines 9–18) whenever Schedule D line 17 is
+ * "Yes", and `worksheets.scheduleDTax` — the Schedule D Tax Worksheet, lines
+ * 1–47, with `null` for every line it says to skip — when either rate group
+ * is more than zero.
  */
 const yesNo = (v: boolean | undefined): number | null =>
   v === undefined ? null : v ? 1 : 0
@@ -931,6 +938,9 @@ export function calculationSnapshot(f: F1040) {
           })()
   }
   const ss = f.socialSecurityBenefitsWorksheet
+  const rg = f.scheduleD.rateGainWorksheet
+  const u = f.scheduleD.unrecaptured1250
+  const sdt = f.scheduleD.taxWorksheet
   const carryoverLines = f.scheduleD.isNeeded()
     ? f.scheduleD.carryoverToNextYear().lines
     : null
@@ -1000,7 +1010,94 @@ export function calculationSnapshot(f: F1040) {
     // lines 8 and 13 are the carryovers into 2026 (Schedule D line 21
     // instructions; Pub. 550). Null when line 21 carries no loss.
     capitalLossCarryover:
-      carryoverLines === null ? null : { lines: carryoverLines as Lines }
+      carryoverLines === null ? null : { lines: carryoverLines as Lines },
+    // v18: the two rate-group worksheets behind Schedule D lines 18 and 19,
+    // completed only when line 17 is "Yes", and the Schedule D Tax Worksheet
+    // that replaces the qualified-dividend one when either is more than zero.
+    rateGain:
+      f.scheduleD.l17() !== true
+        ? null
+        : {
+            lines: {
+              '1': rg.l1(),
+              '2': rg.l2(),
+              '3': rg.l3(),
+              '4': rg.l4(),
+              '5': rg.l5(),
+              '6': rg.l6(),
+              '7': rg.l7()
+            } as Lines
+          },
+    unrecaptured1250:
+      f.scheduleD.l17() !== true
+        ? null
+        : {
+            lines: {
+              '9': u.l9(),
+              '10': u.l10(),
+              '11': u.l11(),
+              '12': u.l12(),
+              '13': u.l13(),
+              '14': u.l14(),
+              '15': u.l15(),
+              '16': u.l16(),
+              '17': u.l17(),
+              '18': u.l18()
+            } as Lines
+          },
+    scheduleDTax: !f.scheduleD.taxWorksheet.isNeeded()
+      ? null
+      : {
+          lines: {
+            '1': sdt.l1(),
+            '2': sdt.l2(),
+            '3': sdt.l3(),
+            '4': sdt.l4(),
+            '5': sdt.l5(),
+            '6': sdt.l6(),
+            '7': sdt.l7(),
+            '8': sdt.l8(),
+            '9': sdt.l9(),
+            '10': sdt.l10(),
+            '11': sdt.l11(),
+            '12': sdt.l12(),
+            '13': sdt.l13(),
+            '14': sdt.l14(),
+            '15': sdt.l15(),
+            '16': sdt.l16(),
+            '17': sdt.l17(),
+            '18': sdt.l18(),
+            '19': sdt.l19(),
+            '20': sdt.l20(),
+            '21': sdt.l21(),
+            '22': sdt.l22(),
+            '23': sdt.l23() ?? null,
+            '24': sdt.l24() ?? null,
+            '25': sdt.l25() ?? null,
+            '26': sdt.l26() ?? null,
+            '27': sdt.l27() ?? null,
+            '28': sdt.l28() ?? null,
+            '29': sdt.l29() ?? null,
+            '30': sdt.l30() ?? null,
+            '31': sdt.l31() ?? null,
+            '32': sdt.l32() ?? null,
+            '33': sdt.l33() ?? null,
+            '34': sdt.l34() ?? null,
+            '35': sdt.l35() ?? null,
+            '36': sdt.l36() ?? null,
+            '37': sdt.l37() ?? null,
+            '38': sdt.l38() ?? null,
+            '39': sdt.l39() ?? null,
+            '40': sdt.l40() ?? null,
+            '41': sdt.l41() ?? null,
+            '42': sdt.l42() ?? null,
+            '43': sdt.l43() ?? null,
+            '44': sdt.l44(),
+            '45': sdt.l45(),
+            '46': sdt.l46(),
+            '47': sdt.l47()
+          } as Lines
+        }
   }
   const indicators = {
     /** Line 7 box: capital gain distributions only, Schedule D not required. */
@@ -1085,7 +1182,7 @@ export function calculationSnapshot(f: F1040) {
         )
       )
   return {
-    schemaVersion: 'ustaxes-1040-line-snapshot-v17',
+    schemaVersion: 'ustaxes-1040-line-snapshot-v18',
     taxYear: 2025,
     form: '1040',
     lines,

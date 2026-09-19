@@ -114,9 +114,9 @@ describe('Form 8949 columns (f) and (g) (TY2025)', () => {
     expect(f.f8949s[0].longTermTotalAdjustments()).toBeUndefined()
   })
 
-  it('is v17', () => {
+  it('is v18', () => {
     expect(calculationSnapshot(returnWith([])).schemaVersion).toBe(
-      'ustaxes-1040-line-snapshot-v17'
+      'ustaxes-1040-line-snapshot-v18'
     )
   })
 })
